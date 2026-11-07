@@ -1,0 +1,21 @@
+[project]
+name = "api"
+version = "0.1.0"
+requires-python = ">=3.12"
+# fastapi: the framework. uvicorn: serves it. httpx: calls Supabase and the LLM.
+# pydantic-settings: reads the root .env.
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pydantic-settings",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

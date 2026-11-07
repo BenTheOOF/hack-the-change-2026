@@ -1,0 +1,56 @@
+# Coding standards
+
+For people and agents who change this repo. Read CONTEXT.md first.
+
+## Write less
+
+1. Ask if the thing needs to exist. If nobody asked for it, skip it.
+2. Look for an existing helper in this repo before writing one.
+3. Use the standard library or the platform before a dependency. Add a dependency only when a few lines cannot do the job, and say why in the PR.
+4. No abstraction with one user. No config for a value that never changes.
+5. When you cut a corner on purpose, leave a comment that starts with `ponytail:` and names the limit and the upgrade path.
+6. Non-trivial logic gets one small test. Do not add a test framework.
+
+## Environment
+
+1. One env file at the repo root. Never create a second `.env` anywhere.
+2. A new variable goes in `.env.example`, then the reader (`config.py` or `process.env`), then `scripts/push-env`.
+3. Never write a real key in any file. `.env` is git-ignored and stays that way.
+4. Browser code may only read `NEXT_PUBLIC_*` names.
+
+## Layout and ownership
+
+1. Web code goes in `frontend/src/features/<feature>/`. Pages in `src/app` stay thin.
+2. API routes go in a new file in `backend/app/routers/`. Do not edit `app/main.py`.
+3. Schema changes go in a new timestamped file in `backend/supabase/migrations/`. Never edit a migration that is on `main`. Never change the schema in the dashboard.
+4. Shared files are listed in `docs/OWNERSHIP.md`. Change them in small PRs and rebase before merging.
+5. Branches are `feat/<name>`. `main` always deploys.
+
+## Security
+
+1. Every table in `public` has row-level security enabled and a policy.
+2. The secret key stays in `backend`. It goes in the `apikey` header only, never in `Authorization` and never to the browser.
+3. Protected API routes use `Depends(get_current_user)`.
+4. The LLM key and model stay server-side. `max_tokens` comes from env.
+
+## TypeScript
+
+1. `strict` stays on. `npm run typecheck` must pass.
+2. Add `"use client"` only to files that need state, effects or the browser client.
+3. Use `createClient` from `@/lib/supabase/client` in the browser and from `@/lib/supabase/server` on the server. Do not build a client by hand.
+
+## Python
+
+1. Type-hint function signatures.
+2. Use `uv add` for packages and commit `uv.lock`.
+3. `uv run pytest` must pass.
+
+## Writing
+
+README text, comments and commit messages use plain sentences. No hype words, no em dashes, no closing summary line.
+
+## Before you push
+
+1. `cd frontend && npm run typecheck`
+2. `cd backend && uv run pytest`
+3. Rebase on `main`.

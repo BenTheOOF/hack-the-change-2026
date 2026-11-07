@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Sends .env to the hosts.
+#   scripts/push-env fly [web-url]      server settings and secrets to Fly (web-url becomes CORS_ORIGINS)
+#   scripts/push-env vercel [api-url]   public variables to Vercel production (api-url becomes NEXT_PUBLIC_API_URL)
+#   scripts/push-env                    both, using the values in .env
+# The URLs are optional because .env holds your local values (127.0.0.1, localhost).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || { echo "No .env found."; exit 1; }
+set -a; . ./.env; set +a
+
+target="${1:-all}"
+override="${2:-}"
+
+push_fly() {
+  [ -n "$override" ] && CORS_ORIGINS="$override"
+  # Skip empty values: fly secrets import rejects them.
+  for k in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SECRET_KEY \
+           CORS_ORIGINS ANTHROPIC_API_KEY LLM_MODEL LLM_MAX_TOKENS; do
+    [ -n "${!k:-}" ] && echo "$k=${!k}"
+  done | fly secrets import -c backend/fly.toml
+}
+
+push_vercel() {
+  [ -n "$override" ] && NEXT_PUBLIC_API_URL="$override"
+  for k in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY NEXT_PUBLIC_API_URL; do
+    (cd frontend
+     vercel env rm "$k" production --yes >/dev/null 2>&1 || true
+     printf %s "${!k}" | vercel env add "$k" production)
+  done
+}
+
+case "$target" in
+  fly) push_fly ;;
+  vercel) push_vercel ;;
+  all) push_fly; push_vercel ;;
+  *) echo "Usage: scripts/push-env [fly|vercel] [url]"; exit 1 ;;
+esac
