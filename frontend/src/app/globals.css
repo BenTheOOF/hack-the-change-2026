@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+form { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+input { padding: 0.4rem; }
+button { padding: 0.4rem 0.8rem; }
+section { margin: 2rem 0; }
+[role="alert"] { color: #b00020; }
