@@ -22,6 +22,7 @@ try {
   for (const name of [
     "20261108010000_physiotrace.sql",
     "20261108020000_custom_exercises.sql",
+    "20261108030000_custom_exercise_trim.sql",
   ])
     await db.exec(
       await readFile(
@@ -203,6 +204,13 @@ try {
       [therapist, demoFrames],
     ),
   );
+  await assert.rejects(
+    db.query(
+      `insert into public.custom_exercises(therapist_id,name,view,demo_frames,demo_start_ms,demo_end_ms)
+      values($1,'Too long','front',$2::jsonb,0,90000)`,
+      [therapist, demoFrames],
+    ),
+  );
   const custom = (await db.query(createSql, [therapist, demoFrames])).rows[0].id;
   const prescribeCustom = `insert into public.exercise_prescriptions(therapist_id,patient_id,exercise,custom_exercise_id,daily_target,starts_on,ends_on)
     values($1,$2,'custom',$3,8,current_date,current_date+7) returning id`;
@@ -268,7 +276,7 @@ try {
   ).rows[0];
   assert.equal(customRep.exercise, "custom");
   console.log(
-    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises. No training ran.",
+    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises and demo trims. No training ran.",
   );
 } finally {
   await db.close();

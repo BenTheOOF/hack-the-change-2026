@@ -70,7 +70,7 @@ uv run --group ml python check_accelerator.py
 
 ## Therapist-defined exercises
 
-Therapists can add their own exercises from the workspace with an uploaded or recorded demo video (up to 60 s, two or more reps, starting and ending at rest). Pose keypoints are extracted in the browser, and a background trainer fits a model:
+Therapists can add their own exercises from the workspace with an uploaded or recorded demo video, then trim it to the part with two or more reps (2 to 60 s, starting and ending at rest). Only that part is used for the model, and patients see it looped. Pose keypoints are extracted in the browser, and a background trainer fits a model:
 
 ```bash
 scripts/worker.sh

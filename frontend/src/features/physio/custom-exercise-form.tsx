@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PoseFrame } from "./engine";
-import { extractDemoPose, MAX_DEMO_SECONDS } from "./extract-pose";
+import { extractDemoPose, MAX_SOURCE_SECONDS, readDuration } from "./extract-pose";
 import { fitTemplate, type TemplateModel } from "./template";
+import { TrimmedVideo } from "./trimmed-video";
+import { clampTrim, formatTime, MAX_DEMO_SECONDS, type Trim } from "./trim";
 
 export type ExerciseSubmission = {
   name: string;
@@ -12,11 +14,15 @@ export type ExerciseSubmission = {
   view: "front" | "side";
   frames: PoseFrame[];
   video: Blob;
+  // The part of the video the model was trained on, in seconds.
+  trim: Trim;
   // Browser preview of the fit. The worker trains the saved model; the demo uses this one.
   preview: TemplateModel;
 };
 
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+// Recordings can run longer than the part used; the therapist trims afterwards.
+const MAX_RECORD_SECONDS = 180;
 
 export function CustomExerciseForm({
   busy,
@@ -33,6 +39,10 @@ export function CustomExerciseForm({
   const [view, setView] = useState<"front" | "side">("front");
   const [video, setVideo] = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>();
+  const [duration, setDuration] = useState(0);
+  const [trim, setTrim] = useState<Trim>({ start: 0, end: 0 });
+  const [playhead, setPlayhead] = useState(0);
+  const previewVideo = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [frames, setFrames] = useState<PoseFrame[] | null>(null);
   const [preview, setPreview] = useState<TemplateModel | null>(null);
@@ -76,19 +86,46 @@ export function CustomExerciseForm({
     }
   }, [frames, view]);
 
-  async function analyseVideo(blob: Blob) {
+  async function chooseVideo(blob: Blob) {
     abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
     setVideo(blob);
     const url = URL.createObjectURL(blob);
     setVideoUrl(url);
     setFrames(null);
     setPreview(null);
     setProblem("");
+    setDuration(0);
+    try {
+      const length = await readDuration(url);
+      if (length > MAX_SOURCE_SECONDS + 1)
+        throw new Error(`Choose a video of ${MAX_SOURCE_SECONDS / 60} minutes or less, then trim it.`);
+      setDuration(length);
+      setTrim(clampTrim({ start: 0, end: Math.min(length, MAX_DEMO_SECONDS) }, length));
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "The video could not be read.");
+    }
+  }
+
+  // Moving either edge clears the previous analysis, since it covered another part.
+  function moveTrim(edge: "start" | "end", value: number) {
+    setTrim((current) => clampTrim({ ...current, [edge]: value }, duration, edge));
+    setFrames(null);
+    setPreview(null);
+    setProblem("");
+    if (previewVideo.current) previewVideo.current.currentTime = value;
+  }
+
+  async function analyse() {
+    if (!videoUrl) return;
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setFrames(null);
+    setPreview(null);
+    setProblem("");
     setProgress(0);
     try {
-      setFrames(await extractDemoPose(url, setProgress, controller.signal));
+      setFrames(await extractDemoPose(videoUrl, trim, setProgress, controller.signal));
     } catch (e) {
       if (controller.signal.aborted) return;
       setProblem(
@@ -145,7 +182,7 @@ export function CustomExerciseForm({
     rec.onstop = () => {
       setRecording(false);
       stopCamera();
-      void analyseVideo(new Blob(chunks, { type: mimeType.split(";")[0] }));
+      void chooseVideo(new Blob(chunks, { type: mimeType.split(";")[0] }));
     };
     recorder.current = rec;
     rec.start(500);
@@ -156,7 +193,7 @@ export function CustomExerciseForm({
       const s = Math.floor((Date.now() - started) / 1000);
       setSeconds(s);
       if (rec.state !== "recording") clearInterval(tick);
-      else if (s >= MAX_DEMO_SECONDS) {
+      else if (s >= MAX_RECORD_SECONDS) {
         clearInterval(tick);
         rec.stop();
       }
@@ -181,6 +218,7 @@ export function CustomExerciseForm({
           view,
           frames,
           video,
+          trim,
           preview,
         });
         if (ok) {
@@ -189,6 +227,7 @@ export function CustomExerciseForm({
           setSteps("");
           setVideo(null);
           setVideoUrl(undefined);
+          setDuration(0);
           setFrames(null);
           setPreview(null);
         }
@@ -220,7 +259,9 @@ export function CustomExerciseForm({
         </fieldset>
       </div>
       <div className="custom-video">
-        <span className="field-label">Demo video (up to {MAX_DEMO_SECONDS} s, 2 or more reps)</span>
+        <span className="field-label">
+          Demo video: upload or record, then keep the part with 2 or more reps (up to {MAX_DEMO_SECONDS} s)
+        </span>
         {camera ? (
           <div className="record-box">
             <video ref={live} muted playsInline aria-label="Camera preview for the demo" />
@@ -242,10 +283,73 @@ export function CustomExerciseForm({
             </div>
           </div>
         ) : videoUrl ? (
-          <video className="demo-preview" src={videoUrl} controls muted playsInline aria-label="Selected demo video" />
+          <>
+            <TrimmedVideo
+              ref={previewVideo}
+              className="demo-preview"
+              src={videoUrl}
+              start={trim.start}
+              end={duration ? trim.end : null}
+              controls
+              muted
+              loop
+              playsInline
+              onTimeUpdate={(e) => setPlayhead(e.currentTarget.currentTime)}
+              aria-label="Selected demo video, playing the chosen part"
+            />
+            {duration > 0 && (
+              <div className="trim-editor">
+                <div className="trim-track" aria-hidden="true">
+                  <span
+                    className="trim-selection"
+                    style={{
+                      left: (trim.start / duration) * 100 + "%",
+                      width: ((trim.end - trim.start) / duration) * 100 + "%",
+                    }}
+                  />
+                  <span className="trim-playhead" style={{ left: (playhead / duration) * 100 + "%" }} />
+                </div>
+                {(["start", "end"] as const).map((edge) => (
+                  <div className="trim-row" key={edge}>
+                    <label>
+                      {edge === "start" ? "Start" : "End"}
+                      <input
+                        type="range"
+                        min={0}
+                        max={duration}
+                        step={0.1}
+                        value={trim[edge]}
+                        onChange={(e) => moveTrim(edge, Number(e.target.value))}
+                        aria-valuetext={formatTime(trim[edge])}
+                      />
+                    </label>
+                    <output>{formatTime(trim[edge])}</output>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => moveTrim(edge, playhead)}
+                    >
+                      Use current frame
+                    </button>
+                  </div>
+                ))}
+                <p className="muted">
+                  Using {(trim.end - trim.start).toFixed(1)} s of {formatTime(duration)}. Start and end the part at rest.
+                </p>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={progress !== null}
+                  onClick={() => void analyse()}
+                >
+                  {frames ? "Analyse again" : "Analyse this part"}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="video-empty">
-            <p>Start and end in the resting position. Do 3 or more slow reps with the whole movement in view.</p>
+            <p>Do 3 or more slow reps with the whole movement in view. You can trim the video after choosing it.</p>
           </div>
         )}
         {!camera && (
@@ -267,7 +371,7 @@ export function CustomExerciseForm({
                     setProblem("Demo videos must be at most 50 MB.");
                     return;
                   }
-                  void analyseVideo(file);
+                  void chooseVideo(file);
                 }}
               />
             </label>

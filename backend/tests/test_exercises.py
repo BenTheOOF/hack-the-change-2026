@@ -147,3 +147,20 @@ def test_custom_reps_are_rechecked_with_the_stored_model() -> None:
         assert saved[0]["p_exercise"] == "custom"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_demo_trim_must_cover_the_keypoints() -> None:
+    client = TestClient(app)
+    calls: list = []
+    try:
+        as_role("therapist", calls)
+        span = DEMO["frames"][-1]["t"]
+        assert client.post("/physio/exercises", json=exercise(demo_start_ms=5000, demo_end_ms=4000)).status_code == 422
+        assert client.post("/physio/exercises", json=exercise(demo_start_ms=0, demo_end_ms=70000)).status_code == 422
+        assert client.post("/physio/exercises", json=exercise(demo_start_ms=1000, demo_end_ms=1000 + span // 2)).status_code == 422
+        assert not calls
+        ok = client.post("/physio/exercises", json=exercise(demo_start_ms=3000, demo_end_ms=3000 + span))
+        assert ok.status_code == 201
+        assert calls[0][2]["demo_start_ms"] == 3000 and calls[0][2]["demo_end_ms"] == 3000 + span
+    finally:
+        app.dependency_overrides.clear()

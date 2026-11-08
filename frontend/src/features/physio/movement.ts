@@ -24,6 +24,9 @@ export type CustomExercise = {
   model: TemplateModel | null;
   model_version: string | null;
   demo_video_path: string | null;
+  // Trimmed part of the demo video, in ms; players loop between these.
+  demo_start_ms?: number;
+  demo_end_ms?: number | null;
   created_at: string;
   // Demo only: one segmented demo rep, replayed by the simulated rep buttons.
   sample_rep?: PoseFrame[];

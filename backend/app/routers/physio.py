@@ -16,7 +16,8 @@ router = APIRouter(prefix="/physio", tags=["physio"])
 # The embedded prescription tells the UI which custom exercise a rep belongs to.
 REP_FIELDS = ("id,session_id,prescription_id,patient_id,exercise,exercise_day,label,error_type,confidence,feedback,"
               "model_version,clip_path,created_at,prescription:exercise_prescriptions(custom_exercise_id)")
-CUSTOM_FIELDS = "id,therapist_id,name,description,steps,view,status,status_detail,model,model_version,demo_video_path,created_at"
+CUSTOM_FIELDS = ("id,therapist_id,name,description,steps,view,status,status_detail,model,model_version,demo_video_path,"
+                 "demo_start_ms,demo_end_ms,created_at")
 
 
 class Care:

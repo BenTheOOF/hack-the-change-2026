@@ -2239,3 +2239,74 @@ legend {
     grid-template-columns: 1fr;
   }
 }
+.trim-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.trim-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: #edf0e8;
+  overflow: hidden;
+}
+.trim-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #8fb07f;
+  border-radius: 6px;
+}
+.trim-playhead {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+.trim-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.trim-row label {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.trim-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--green);
+}
+.trim-row output {
+  font-variant-numeric: tabular-nums;
+}
+.trim-row .text-button {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.trim-editor .muted {
+  margin: 0;
+  font-size: 12px;
+}
+.trim-editor > .secondary {
+  align-self: flex-start;
+}
+@media (max-width: 700px) {
+  .trim-row {
+    grid-template-columns: minmax(0, 1fr) 50px;
+  }
+  .trim-row .text-button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

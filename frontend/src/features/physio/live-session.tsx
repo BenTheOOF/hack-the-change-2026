@@ -19,6 +19,7 @@ import { MovementGauge } from "./movement-gauge";
 import type { ExerciseInfo, Movement } from "./movement";
 import { createPoseLandmarker } from "./pose-model";
 import { PoseReplay } from "./pose-replay";
+import { TrimmedVideo } from "./trimmed-video";
 import type { Prescription } from "./types";
 
 // Turn browser camera and model-loading failures into steps a patient can act on.
@@ -797,8 +798,12 @@ export function LiveSession({
         {demoVideoUrl && (
           <div className="panel demo-video-panel">
             <span className="eyebrow">YOUR THERAPIST&apos;S DEMO</span>
-            <video
+            <TrimmedVideo
               src={demoVideoUrl}
+              start={(info.custom?.demo_start_ms ?? 0) / 1000}
+              end={
+                info.custom?.demo_end_ms ? info.custom.demo_end_ms / 1000 : null
+              }
               controls
               muted
               loop

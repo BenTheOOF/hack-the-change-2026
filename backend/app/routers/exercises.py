@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config import settings
 from app.routers.physio import Context
@@ -16,7 +16,8 @@ from app.template import DemoFrame
 
 router = APIRouter(prefix="/physio", tags=["physio"])
 # demo_frames is large and only the worker needs it, so lists leave it out.
-FIELDS = "id,therapist_id,name,description,steps,view,status,status_detail,model,model_version,demo_video_path,created_at,trained_at"
+FIELDS = ("id,therapist_id,name,description,steps,view,status,status_detail,model,model_version,demo_video_path,"
+          "demo_start_ms,demo_end_ms,created_at,trained_at")
 VIDEO_TYPES = {"video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov"}
 MAX_VIDEO = 50 * 1024 * 1024
 
@@ -27,6 +28,19 @@ class ExerciseInput(BaseModel):
     steps: list[str] = Field(default_factory=list, max_length=10)
     view: Literal["front", "side"]
     demo_frames: list[DemoFrame] = Field(min_length=20, max_length=600)
+    # The trimmed part of the uploaded video, in ms. Frames start at 0 at demo_start_ms.
+    demo_start_ms: int = Field(default=0, ge=0, le=600_000)
+    demo_end_ms: int | None = Field(default=None, gt=0, le=600_000)
+
+    @model_validator(mode="after")
+    def trim_fits(self) -> "ExerciseInput":
+        if self.demo_end_ms is not None:
+            span = self.demo_end_ms - self.demo_start_ms
+            if span <= 0 or span > 60_100:
+                raise ValueError("Choose a part of the video between 2 and 60 seconds long.")
+            if self.demo_frames[-1].t > span + 100:
+                raise ValueError("The demo keypoints run past the chosen part of the video.")
+        return self
 
     @field_validator("name")
     @classmethod
@@ -57,6 +71,7 @@ async def create_exercise(data: ExerciseInput, ctx: Context) -> object:
     rows = await ctx.call("POST", f"/rest/v1/custom_exercises?select={FIELDS}", {
         "therapist_id": ctx.user["id"], "name": data.name, "description": data.description,
         "steps": data.steps, "view": data.view, "demo_frames": [f.model_dump() for f in data.demo_frames],
+        "demo_start_ms": data.demo_start_ms, "demo_end_ms": data.demo_end_ms,
     })
     return rows[0] if isinstance(rows, list) else rows
 

@@ -19,6 +19,7 @@ import {
   type ExerciseSubmission,
 } from "./custom-exercise-form";
 import { ExerciseSteps } from "./exercise-steps";
+import { TrimmedVideo } from "./trimmed-video";
 import { LiveSession } from "./live-session";
 import {
   customIdOf,
@@ -358,6 +359,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             model: form.preview,
             model_version: form.preview.version,
             demo_video_path: null,
+            demo_start_ms: Math.round(form.trim.start * 1000),
+            demo_end_ms: Math.round(form.trim.end * 1000),
             created_at: new Date().toISOString(),
             sample_rep: sample ? trimLeadIn(form.preview.spec, sample) : undefined,
           },
@@ -371,6 +374,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           steps: form.steps,
           view: form.view,
           demo_frames: form.frames,
+          demo_start_ms: Math.round(form.trim.start * 1000),
+          demo_end_ms: Math.round(form.trim.end * 1000),
         });
         setCustoms((current) => [row, ...current]);
         try {
@@ -1183,6 +1188,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                             {plan.custom_exercise_id && (
                               <DemoVideo
                                 url={demoVideoUrls[plan.custom_exercise_id]}
+                                custom={info(plan).custom}
                                 onOpen={() => demoVideoFor(plan.custom_exercise_id!)}
                                 name={info(plan).name}
                               />
@@ -1756,10 +1762,12 @@ function MovementIllustration({
 }
 function DemoVideo({
   url,
+  custom,
   onOpen,
   name,
 }: {
   url?: string;
+  custom?: CustomExercise;
   onOpen: () => Promise<void>;
   name: string;
 }) {
@@ -1779,7 +1787,16 @@ function DemoVideo({
       </button>
       {open &&
         (url ? (
-          <video src={url} controls muted loop playsInline aria-label={"Demo of " + name} />
+          <TrimmedVideo
+            src={url}
+            start={(custom?.demo_start_ms ?? 0) / 1000}
+            end={custom?.demo_end_ms ? custom.demo_end_ms / 1000 : null}
+            controls
+            muted
+            loop
+            playsInline
+            aria-label={"Demo of " + name}
+          />
         ) : (
           <p className="muted">Loading the demo video…</p>
         ))}
