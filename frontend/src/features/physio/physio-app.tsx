@@ -826,7 +826,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 className={"nav-item " + (page === "exercises" ? "selected" : "")}
                 onClick={() => void openPage("exercises")}
               >
-                <span>✚</span>Your exercises
+                <span>✚</span>Add exercise
                 {training && <span className="nav-number">…</span>}
               </button>
             </>
@@ -1179,7 +1179,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">MOVEMENTS MADE FOR YOUR PATIENTS</span>
-                  <h1>Your exercises.</h1>
+                  <h1>Add exercise.</h1>
                   <p>Add a movement from a demo video. Once its model is ready, prescribe it like any other exercise.</p>
                 </div>
               </div>
@@ -1823,14 +1823,14 @@ function modelStat(customs: CustomExercise[]) {
   const waiting = count("queued") + count("training");
   const failed = count("failed");
   if (!customs.length)
-    return { value: "None", detail: "Add one under Your exercises" };
+    return { value: "None", detail: "Add one in Add exercise" };
   return {
     value: String(ready),
     suffix: " ready",
     detail: waiting
       ? `${waiting} training now`
       : failed
-        ? `${failed} failed, see Your exercises`
+        ? `${failed} failed, see Add exercise`
         : "All up to date",
   };
 }
