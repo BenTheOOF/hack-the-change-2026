@@ -1252,9 +1252,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   color="sage"
                 />
                 <Stat
-                  label="Model updates"
-                  value="Offline"
-                  detail="Labels never trigger training"
+                  label="Exercise models"
+                  {...modelStat(customs)}
                   color="cream"
                 />
               </div>
@@ -1814,6 +1813,26 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       )}
     </div>
   );
+}
+
+// The therapist's own exercise models, as the offline trainer reports them.
+function modelStat(customs: CustomExercise[]) {
+  const count = (status: CustomExercise["status"]) =>
+    customs.filter((c) => c.status === status).length;
+  const ready = count("ready");
+  const waiting = count("queued") + count("training");
+  const failed = count("failed");
+  if (!customs.length)
+    return { value: "None", detail: "Add one under Your exercises" };
+  return {
+    value: String(ready),
+    suffix: " ready",
+    detail: waiting
+      ? `${waiting} training now`
+      : failed
+        ? `${failed} failed, see Your exercises`
+        : "All up to date",
+  };
 }
 
 function Stat({
