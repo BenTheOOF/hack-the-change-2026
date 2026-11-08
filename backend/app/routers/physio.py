@@ -40,6 +40,10 @@ class Care:
         if r.is_error:
             data = r.json() if "json" in r.headers.get("content-type", "") else {}
             code = data.get("code", "") if isinstance(data, dict) else ""
+            # A column or function the code expects is missing: a migration was not applied.
+            if code in ("42703", "42P01", "42883", "PGRST202", "PGRST204", "PGRST205"):
+                raise HTTPException(503, "The database is missing a PhysioTrace migration. Apply the files in "
+                                         "backend/supabase/migrations (supabase db push), then retry.")
             # P0001 messages are written in our own migrations for people to read.
             if code == "P0001" and data.get("message"):
                 raise HTTPException(409, data["message"])
@@ -56,8 +60,13 @@ class Care:
             raise HTTPException(409, "Apply the PhysioTrace migration to create your care profile.")
         profile = rows[0]
         if not profile.get("is_admin") and self.is_env_admin():
-            granted = await self.call("POST", "/rest/v1/rpc/bootstrap_admin", {"p_user": self.user["id"]}, service=True)
-            profile = granted[0] if isinstance(granted, list) else granted
+            try:
+                granted = await self.call("POST", "/rest/v1/rpc/bootstrap_admin", {"p_user": self.user["id"]}, service=True)
+                profile = granted[0] if isinstance(granted, list) else granted
+            except HTTPException:
+                # Granting admin must never lock someone out of their own care plan (for example when
+                # the admin migration is not applied yet). They stay a regular account until it works.
+                pass
         # Admins can use the patient and therapist features for their own relationships.
         if role and profile["role"] != role and not profile.get("is_admin"):
             raise HTTPException(403, f"This action requires a {role} account.")

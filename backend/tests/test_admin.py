@@ -88,3 +88,30 @@ def test_our_database_messages_reach_the_user(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(HTTPException) as error:
         asyncio.run(Care({"id": "x"}, "Bearer t").call("POST", "/rest/v1/rpc/admin_set_admin", {}))
     assert error.value.status_code == 409 and error.value.detail == "Keep at least one admin"
+
+
+def test_a_missing_admin_migration_does_not_block_sign_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(settings, "admin_emails", "owner@example.com")
+    ctx = Care({"id": "u1", "email": "owner@example.com", "app_metadata": {"providers": ["google"]}}, "Bearer t")
+
+    async def call(method: str, path: str, body: object = None, **kwargs: object) -> object:
+        if "care_profiles?" in path:
+            return [{"role": "patient"}]  # no is_admin column yet
+        raise HTTPException(503, "The database is missing a PhysioTrace migration.")
+    ctx.call = call
+    assert asyncio.run(ctx.profile())["role"] == "patient"
+
+
+def test_missing_columns_or_functions_name_the_migration(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+    from fastapi import HTTPException
+
+    for code in ("42703", "PGRST202"):
+        async def request(self: httpx.AsyncClient, method: str, url: str, code=code, **kwargs: object) -> httpx.Response:
+            return httpx.Response(400, json={"code": code, "message": "missing"})
+        monkeypatch.setattr(httpx.AsyncClient, "request", request)
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(Care({"id": "x"}, "Bearer t").call("GET", "/rest/v1/care_profiles?select=is_admin"))
+        assert error.value.status_code == 503 and "migration" in error.value.detail

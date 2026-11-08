@@ -982,7 +982,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 ))}
               </div>
             )}
-            <span className="date-label">
+            {/* The server and browser can disagree on today's date (time zones, midnight). */}
+            <span className="date-label" suppressHydrationWarning>
               {new Date().toLocaleDateString([], {
                 month: "short",
                 day: "numeric",
