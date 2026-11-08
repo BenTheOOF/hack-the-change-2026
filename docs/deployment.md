@@ -133,7 +133,7 @@ Set these in `/opt/physiotrace/.env`. This single file is read by the web app, t
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the production `sb_publishable_...` key |
 | `SUPABASE_SECRET_KEY` | the production `sb_secret_...` key (server only) |
 | `NEXT_PUBLIC_API_URL` | `https://api.example.com` |
-| `SITE_URL` | `https://app.example.com` (where Google sign-in and sign-out land; without it they can send people to `localhost:3000`) |
+| `SITE_URL` | `https://app.example.com` (optional fallback for the Google sign-in return address; the browser's own address is used first) |
 | `CORS_ORIGINS` | `https://app.example.com` |
 | `LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` (Gemini) |
 | `LLM_API_KEY` | your Gemini API key (leave empty to turn the assistant off) |
@@ -294,7 +294,8 @@ If the update adds files under `backend/supabase/migrations/`, push them to the 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | Dashboard says "The PhysioTrace API did not respond" | API service down | `systemctl status physiotrace-api`, then `journalctl -u physiotrace-api -n 50` |
-| Google sign-in ends on `https://localhost:3000/dashboard` | `SITE_URL` not set, or an old build | Set `SITE_URL=https://app.example.com` in `.env`, then `sudo systemctl restart physiotrace-web`. In Supabase URL Configuration, the Site URL must be the domain, not localhost |
+| Google sign-in ends on `https://localhost:3000/dashboard` | Build older than this fix | Pull, rebuild the web app, restart `physiotrace-web` |
+| Google sign-in lands back on the login or home page with no error | Build older than this fix, or Supabase's Site URL or Redirect URLs still point at localhost | Pull and rebuild. In Supabase URL Configuration set the Site URL to `https://app.example.com` and add `https://app.example.com/auth/callback` (and the `www.` form if you serve it). Clear the site's cookies and try again |
 | "Could not reach the PhysioTrace API" or CORS errors in the console | `NEXT_PUBLIC_API_URL` or `CORS_ORIGINS` wrong | Fix `.env`, rebuild the web app, restart both services |
 | "The database is missing a PhysioTrace migration" | Migrations not pushed to production | `npx supabase db push --remote` from `backend/` |
 | Google sign-in returns to the login page with an error | Redirect URL not allowed | Add `https://app.example.com/auth/callback` in Supabase URL Configuration; check the Google client's redirect URI |
