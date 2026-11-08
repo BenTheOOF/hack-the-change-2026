@@ -7,9 +7,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Exercise = Literal["squat", "shoulder_abduction"]
-MODEL_VERSION = "rules-1.1.0"
+MODEL_VERSION = "rules-1.2.0"
 # Rule thresholds. Keep in sync with RULES in frontend/src/features/physio/engine.ts.
-SQUAT_REST, SQUAT_MOVE, SQUAT_DEPTH = 155, 145, (50, 130)
+SQUAT_REST, SQUAT_MOVE, SQUAT_DEPTH = 155, 145, (50, 115)
 SHOULDER_REST, SHOULDER_MOVE, SHOULDER_PEAK, SHOULDER_ASYMMETRY = 35, 40, (70, 130), 35
 MIN_TEMPO_MS, MAX_GAP_MS = 1000, 700
 VISIBLE = 0.5

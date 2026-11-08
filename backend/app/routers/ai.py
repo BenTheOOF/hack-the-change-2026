@@ -26,6 +26,24 @@ SYSTEM_PROMPT = (
 )
 
 
+# For therapists (and admins in the therapist view): the same limits, plus how the app's review and
+# prescription workflow works, so answers about it are accurate. It is never sent patient data either.
+THERAPIST_PROMPT = (
+    "You are the PhysioTrace assistant for physical therapists using the app. Answer questions about using "
+    "PhysioTrace and general exercise coaching, in clear professional language and under 200 words. How the app "
+    "works: the patient's browser extracts pose keypoints (never raw video) and a per-exercise classifier judges "
+    "each rep. High-confidence correct reps are counted; high-confidence incorrect reps are replayed with "
+    "corrective feedback; inconclusive reps go to the therapist's review queue, with the clip only if the patient "
+    "consented to sharing. The therapist labels each clip correct or incorrect, adds an error type and written "
+    "feedback, and a clip relabelled correct counts toward that day's reps. Therapists prescribe exercises with a "
+    "daily rep target, dates and a confidence threshold, and can add custom exercises from a trimmed demo video of "
+    "two or more slow reps, which an offline trainer fits before it can be prescribed. Labels never trigger "
+    "training, and clips are used for training only with the patient's separate consent. You cannot see any "
+    "patient, clip, or plan. Never diagnose or make decisions about a specific patient; clinical judgement is the "
+    "therapist's. If someone shares names or other identifying details, remind them not to."
+)
+
+
 class Turn(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=4000)
@@ -35,6 +53,8 @@ class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     # Earlier turns of this conversation, kept in the browser only.
     history: list[Turn] = Field(default_factory=list, max_length=10)
+    # Which view the question comes from. It only picks the system prompt; neither prompt carries care data.
+    audience: Literal["patient", "therapist"] = "patient"
 
 
 @router.post("/ai/chat")
@@ -65,7 +85,10 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
                 "model": settings.llm_model,
                 "max_tokens": settings.llm_max_tokens,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "system",
+                        "content": THERAPIST_PROMPT if body.audience == "therapist" else SYSTEM_PROMPT,
+                    },
                     *(turn.model_dump() for turn in body.history),
                     {"role": "user", "content": body.message},
                 ],

@@ -80,7 +80,7 @@ On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exe
 
 ## Ask PhysioTrace assistant
 
-Signed-in patients and therapists can open "Ask PhysioTrace" in the sidebar for general questions about technique, camera setup, and the app. It uses the OpenAI-compatible LLM settings in `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; Gemini by default) and allows 20 questions per person per day. Only the typed conversation is sent to the provider, never plans, reps, feedback, or video, and answers always defer to the therapist.
+Signed-in patients and therapists can open "Ask PhysioTrace" in the sidebar for general questions about technique, camera setup, and the app. Therapists get their own version, with suggestions and a system prompt about the review queue, prescriptions, custom exercises, and coaching cues; it is reminded that clinical judgement is the therapist's and to keep identifying details out. It uses the OpenAI-compatible LLM settings in `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; Gemini by default) and allows 20 questions per person per day. Only the typed conversation is sent to the provider, never plans, reps, feedback, or video, and answers always defer to the therapist.
 
 ## Connect Supabase
 

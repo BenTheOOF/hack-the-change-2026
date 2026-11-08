@@ -81,10 +81,17 @@ test("shoulder abduction completes only after the arms return", () => {
 
 test("typical lite-model tracking and a moderate rehab squat count", () => {
   // Knees and ankles often report about 0.7 visibility while clearly in frame.
-  const moderate = sequence("squat", [175, 165, 145, 125, 120, 140, 165, 175], 0.7);
+  const moderate = sequence("squat", [175, 165, 145, 125, 112, 140, 165, 175], 0.7);
   const result = ruleClassifier.classify("squat", moderate, 0.8);
   assert.equal(result.label, "correct");
   assert.ok(result.confidence >= 0.8);
+  // rules-1.2.0: the bottom must reach 115 degrees; a 120 degree squat is too shallow now.
+  const shallow = ruleClassifier.classify(
+    "squat",
+    sequence("squat", [175, 165, 145, 125, 120, 140, 165, 175], 0.7),
+    0.8,
+  );
+  assert.equal(shallow.error_type, "range_of_motion");
   const raise = sequence("shoulder_abduction", [10, 25, 50, 72, 50, 25, 10], 0.7);
   assert.equal(
     ruleClassifier.classify("shoulder_abduction", raise, 0.8).label,
@@ -143,7 +150,8 @@ test("the movement gauge matches the classifier's counting range", () => {
     movementProgress(e, a).zone;
   assert.equal(zone("squat", 175), "rest");
   assert.equal(zone("squat", 145), "approach");
-  assert.equal(zone("squat", 130), "target");
+  assert.equal(zone("squat", 130), "approach");
+  assert.equal(zone("squat", 115), "target");
   assert.equal(zone("squat", 90), "target");
   assert.equal(zone("squat", 50), "target");
   assert.equal(zone("squat", 45), "over");
@@ -151,7 +159,7 @@ test("the movement gauge matches the classifier's counting range", () => {
   assert.equal(zone("shoulder_abduction", 55), "approach");
   assert.equal(zone("shoulder_abduction", 90), "target");
   assert.equal(zone("shoulder_abduction", 140), "over");
-  const squat = movementProgress("squat", 130);
+  const squat = movementProgress("squat", 115);
   assert.equal(squat.position, squat.bandStart);
   assert.ok(squat.bandStart < squat.bandEnd);
   assert.equal(movementProgress("squat", 180).position, 0);
