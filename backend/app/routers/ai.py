@@ -1,3 +1,5 @@
+from typing import Literal
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -11,8 +13,28 @@ router = APIRouter()
 DAILY_LIMIT = 20
 
 
+# The assistant gives general guidance only. It is never sent the user's plan, reps, or
+# feedback, and it must defer to their physical therapist and stop on any sign of pain.
+SYSTEM_PROMPT = (
+    "You are the PhysioTrace assistant inside a physiotherapy exercise app. Answer general questions about "
+    "exercise technique, warming up, posture, camera setup for the app, and how the app works, in plain, "
+    "encouraging language and under 150 words. You do not know the user's condition, plan, or history, and you "
+    "cannot see them. Never diagnose, never prescribe new exercises, loads, or medication, and never contradict "
+    "their physical therapist; for anything specific to their body or recovery, suggest they ask their therapist. "
+    "If they mention pain, swelling, dizziness, numbness, chest pain, or a new injury, tell them to stop exercising "
+    "and contact their therapist or a doctor, and in an emergency their local emergency number."
+)
+
+
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    # Earlier turns of this conversation, kept in the browser only.
+    history: list[Turn] = Field(default_factory=list, max_length=10)
 
 
 @router.post("/ai/chat")
@@ -42,7 +64,11 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
             json={
                 "model": settings.llm_model,
                 "max_tokens": settings.llm_max_tokens,
-                "messages": [{"role": "user", "content": body.message}],
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    *(turn.model_dump() for turn in body.history),
+                    {"role": "user", "content": body.message},
+                ],
             },
         )
     if r.status_code != 200:

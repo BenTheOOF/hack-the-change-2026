@@ -18,6 +18,7 @@ import {
   trainingStatusLabel,
   type ExerciseSubmission,
 } from "./custom-exercise-form";
+import { Assistant } from "@/features/ai/assistant";
 import { AdminConsole, type Account, type Assignment } from "./admin-console";
 import { ExerciseSteps } from "./exercise-steps";
 import { TrimmedVideo } from "./trimmed-video";
@@ -851,6 +852,12 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               </button>
             </>
           )}
+              <button
+                className={"nav-item " + (page === "assistant" ? "selected" : "")}
+                onClick={() => void openPage("assistant")}
+              >
+                <span>?</span>Ask PhysioTrace
+              </button>
             </>
           )}
         </nav>
@@ -1072,7 +1079,9 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               onClose={endSession}
             />
           ) : role === "therapist" ? (
-            page === "plans" ? (
+            page === "assistant" ? (
+              <Assistant token={() => token.current} demo={demo} />
+            ) : page === "plans" ? (
               <>
               <div className="page-heading">
                 <div>
@@ -1396,6 +1405,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               </div>
               </>
             )
+          ) : page === "assistant" ? (
+            <Assistant token={() => token.current} demo={demo} />
           ) : page === "today" ? (
             <>
               <div className="page-heading">

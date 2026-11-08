@@ -78,6 +78,10 @@ scripts/worker.sh
 
 On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exercises every 5 seconds, and marks each one Ready or Failed with a reason shown to the therapist. Ready exercises can be prescribed like the built-in ones. The demo needs no worker: it fits the model in the browser right away.
 
+## Ask PhysioTrace assistant
+
+Signed-in patients and therapists can open "Ask PhysioTrace" in the sidebar for general questions about technique, camera setup, and the app. It uses the OpenAI-compatible LLM settings in `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; Gemini by default) and allows 20 questions per person per day. Only the typed conversation is sent to the provider, never plans, reps, feedback, or video, and answers always defer to the therapist.
+
 ## Connect Supabase
 
 1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the backend-only `SUPABASE_SECRET_KEY` in the root `.env`. Keep the existing key names.

@@ -105,4 +105,5 @@ without changes elsewhere.
 - Pose tracking uses MediaPipe's full model (better for push-ups and floor work) and keeps a rep through misses of up to 600 ms.
 - Template fits `template-1.1.0`: side-on demos follow the visible side and match patients facing either way; rest is found from both ends of the clip.
 - Sign-in: email/password or Google (Supabase OAuth). Admin accounts (`is_admin`) manage roles, admins, and assignments from an Admin tab and can open both views for their own data; the first admin comes from `ADMIN_EMAILS` (Google-verified only) or `backend/supabase/admin-grant.sql`.
+- "Ask PhysioTrace" assistant (patients and therapists) uses `/ai/chat` with a safety system prompt; only the typed conversation is sent, never care data. Favicon and app icons from the pulse mark.
 - Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).
