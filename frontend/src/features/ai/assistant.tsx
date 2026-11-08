@@ -5,11 +5,45 @@ import { apiFetch } from "@/lib/api";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
-const SUGGESTIONS = [
-  "How do I keep my knees comfortable in a squat?",
-  "What should I do if a rep hurts?",
-  "How should I set up my camera?",
-];
+export type Audience = "patient" | "therapist";
+
+// Page copy for each view. The API picks the matching system prompt from `audience`.
+const COPY: Record<
+  Audience,
+  {
+    eyebrow: string;
+    lead: string;
+    notice: string;
+    suggestions: string[];
+    placeholder: string;
+  }
+> = {
+  patient: {
+    eyebrow: "QUESTIONS, ANSWERED KINDLY",
+    lead: "General help with technique, setup, and using the app. Your therapist knows your recovery best.",
+    notice:
+      "ⓘ General guidance, not medical advice. It does not see your plan or your camera. Stop if you feel pain and ask your therapist.",
+    suggestions: [
+      "How do I keep my knees comfortable in a squat?",
+      "What should I do if a rep hurts?",
+      "How should I set up my camera?",
+    ],
+    placeholder: "Ask about technique, setup, or the app…",
+  },
+  therapist: {
+    eyebrow: "FOR YOUR PRACTICE",
+    lead: "Help with the review queue, prescriptions, custom exercises, and coaching cues. Your clinical judgement comes first.",
+    notice:
+      "ⓘ General information, not clinical advice. It does not see your patients, their clips, or their plans. Leave out names and other identifying details.",
+    suggestions: [
+      "How should I label a rep that is borderline?",
+      "What makes a good demo video for a custom exercise?",
+      "How does the confidence threshold decide which reps I review?",
+      "Give me simple cues for knees caving in during a squat.",
+    ],
+    placeholder: "Ask about reviews, prescriptions, or cueing…",
+  },
+};
 // The API accepts the last 10 turns; older ones stay on screen but are not sent.
 const HISTORY_SENT = 10;
 
@@ -18,10 +52,13 @@ const HISTORY_SENT = 10;
 export function Assistant({
   token,
   demo,
+  audience = "patient",
 }: {
   token: () => string;
   demo: boolean;
+  audience?: Audience;
 }) {
+  const copy = COPY[audience];
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -44,7 +81,7 @@ export function Assistant({
       const data: { reply: string } = await apiFetch("/ai/chat", token(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({ message, history, audience }),
       });
       setTurns((t) => [
         ...t,
@@ -67,18 +104,14 @@ export function Assistant({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">QUESTIONS, ANSWERED KINDLY</span>
+          <span className="eyebrow">{copy.eyebrow}</span>
           <h1>Ask PhysioTrace.</h1>
-          <p>
-            General help with technique, setup, and using the app. Your
-            therapist knows your recovery best.
-          </p>
+          <p>{copy.lead}</p>
         </div>
       </div>
       <div className="panel assistant-panel">
         <p className="assistant-notice" role="note">
-          ⓘ General guidance, not medical advice. It does not see your plan or
-          your camera. Stop if you feel pain and ask your therapist.
+          {copy.notice}
         </p>
         {demo ? (
           <div className="empty-state">
@@ -94,7 +127,7 @@ export function Assistant({
               {turns.length === 0 && (
                 <div className="assistant-suggestions">
                   <span className="muted">Try asking:</span>
-                  {SUGGESTIONS.map((s) => (
+                  {copy.suggestions.map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -148,7 +181,7 @@ export function Assistant({
                 }}
                 rows={2}
                 maxLength={4000}
-                placeholder="Ask about technique, setup, or the app…"
+                placeholder={copy.placeholder}
               />
               <button className="primary" disabled={sending || !draft.trim()}>
                 {sending ? "Sending…" : "Send →"}

@@ -17,13 +17,13 @@ export interface RepClassifier {
     threshold: number,
   ): Evaluation;
 }
-export const MODEL_VERSION = "rules-1.1.0";
+export const MODEL_VERSION = "rules-1.2.0";
 // Rule thresholds. Keep in sync with backend/app/physio.py.
 // MediaPipe treats visibility >= 0.5 as visible; the lite model often rates
 // knees and ankles 0.6-0.85 even when they are clearly in frame.
 export const RULES = {
   visible: 0.5,
-  squat: { rest: 155, move: 145, depthMin: 50, depthMax: 130 },
+  squat: { rest: 155, move: 145, depthMin: 50, depthMax: 115 },
   shoulder: { rest: 35, move: 40, peakMin: 70, peakMax: 130, asymmetry: 35 },
   minTempoMs: 1000,
   maxGapMs: 700,
@@ -116,7 +116,7 @@ export const EXERCISES = {
       "Place the camera at hip height, 2 to 3 metres away, and stand side-on so your whole body is in view.",
       "Stand tall with feet hip-width apart and knees straight.",
       "Push your hips back and bend your knees as if sitting into a chair. Keep your chest up and heels down.",
-      "Go only as low as is comfortable, roughly until your thighs point down at an angle.",
+      "Lower until your thighs are about halfway to level with the floor, into the target band on the gauge. Never push past what is comfortable.",
       "Stand back up slowly until your knees are straight. Take about two seconds for the whole rep.",
     ],
   },
