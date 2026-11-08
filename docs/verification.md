@@ -20,6 +20,7 @@ Live Supabase sign-up/sign-in, the Storage HTTP service, actual camera capture, 
 - `uv lock` resolved the platform-split `ml` group. `uv sync --group ml` installed MLX 0.32.4 and mlx-metal. `uv run --group ml python check_accelerator.py` ran the matrix multiply on `Device(gpu, 0)` through MLX. CUDA was not available on this machine and was not re-tested.
 - `uv run --group ml pytest`: 7 passed.
 - Frontend `npm run typecheck`, `npm test` (3 passed), and `npm run build` passed on Node 22.
+- Camera fix: the ignored `public/mediapipe/` assets had never been generated, so pose tracking failed after camera permission. `predev` and `prebuild` now run `pose:setup`. In the browser, the local WASM and lite pose model loaded and `PoseLandmarker.detectForVideo` ran. Blocked, missing, busy, and insecure-origin camera cases now show plain instructions. A live camera feed was not tested because the in-app browser blocks camera access.
 - The demo was checked at 1440 px and 375 px: correct, incorrect, and uncertain simulated reps, the replay auto-scroll, today's target in the session panel, and the therapist flag reason. No horizontal overflow at 375 px. No console errors.
 
 The local Git metadata was initially empty. Main-branch history was recovered from the connected repository without overwriting implementation files. Work is on feat/physiotrace. Nothing was pushed or deployed.

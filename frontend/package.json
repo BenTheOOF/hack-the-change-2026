@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/prepare-pose.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/prepare-pose.mjs",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test": "node --test src/features/physio/engine.test.ts",

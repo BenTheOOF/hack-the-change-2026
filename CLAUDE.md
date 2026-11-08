@@ -30,7 +30,7 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 - Backend dev: `cd backend && uv run uvicorn app.main:app --reload`, or `scripts/backend.ps1` on Windows
 - ML accelerator check: `cd backend && uv sync --group ml && uv run --group ml python check_accelerator.py`
 - Tests: `cd frontend && npm test && npm run typecheck`; `cd backend && uv run pytest`
-- Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup`
+- Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup` (runs automatically before dev and build)
 
 ## Core architecture
 Classify **pose keypoint sequences**, never raw video frames:

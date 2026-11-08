@@ -15,6 +15,22 @@ import {
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
 
+// Turn browser camera and model-loading failures into steps a patient can act on.
+export function cameraErrorMessage(error: unknown): string {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError")
+    return "Camera access was blocked. Allow the camera for this site in your browser’s address bar or settings, then try again.";
+  if (name === "NotFoundError" || name === "OverconstrainedError")
+    return "No camera was found. Connect a camera or try another device.";
+  if (name === "NotReadableError" || name === "AbortError")
+    return "Your camera is busy. Close other apps or tabs that use it, then try again.";
+  if (name === "PoseModelError")
+    return "The pose tracker could not load. Run `npm run pose:setup` in frontend, then reload this page.";
+  return error instanceof Error && error.message
+    ? error.message
+    : "The camera could not start. Please try again.";
+}
+
 type Props = {
   plan: Prescription;
   demo: boolean;
@@ -200,6 +216,14 @@ export function LiveSession({
     setLoading(true);
     setError("");
     const current = ++generation.current;
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      // Browsers only expose the camera on HTTPS or localhost, not on a LAN IP over plain HTTP.
+      setError(
+        "The camera only works on a secure page. Open PhysioTrace over HTTPS or at http://localhost on this device.",
+      );
+      setLoading(false);
+      return;
+    }
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: 640, height: 480 },
@@ -210,19 +234,26 @@ export function LiveSession({
         return;
       }
       stream.current = media;
-      const vision = await import("@mediapipe/tasks-vision");
-      const files =
-        await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
-      const pose = await vision.PoseLandmarker.createFromOptions(files, {
-        baseOptions: {
-          modelAssetPath: "/mediapipe/pose_landmarker_lite.task",
-          delegate: "CPU",
-        },
-        runningMode: "VIDEO",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
-      });
+      let pose: PoseLandmarker;
+      try {
+        const vision = await import("@mediapipe/tasks-vision");
+        const files =
+          await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
+        pose = await vision.PoseLandmarker.createFromOptions(files, {
+          baseOptions: {
+            modelAssetPath: "/mediapipe/pose_landmarker_lite.task",
+            delegate: "CPU",
+          },
+          runningMode: "VIDEO",
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6,
+        });
+      } catch (cause) {
+        const error = new Error("Pose model failed to load.", { cause });
+        error.name = "PoseModelError";
+        throw error;
+      }
       if (!mounted.current || generation.current !== current) {
         pose.close();
         media.getTracks().forEach((t) => t.stop());
@@ -341,11 +372,7 @@ export function LiveSession({
       animation.current = requestAnimationFrame(loop);
     } catch (e) {
       stopCamera();
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Camera access is unavailable. Use HTTPS or localhost and allow camera access.",
-      );
+      setError(cameraErrorMessage(e));
     } finally {
       if (mounted.current) setLoading(false);
     }
