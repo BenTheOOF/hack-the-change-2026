@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import {
+  autoStart,
   demoFrame,
   drawSkeleton,
   EXERCISES,
@@ -12,6 +13,7 @@ import {
   type Evaluation,
   type PoseFrame,
 } from "./engine";
+import { ExerciseSteps } from "./exercise-steps";
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
 
@@ -46,6 +48,9 @@ export function cameraErrorMessage(error: unknown): string {
     : "The camera could not start. Please try again.";
 }
 
+const READY_HOLD_MS = 1500;
+const REPLAY_PAUSE_MS = 3000;
+
 type Props = {
   plan: Prescription;
   demo: boolean;
@@ -78,8 +83,12 @@ export function LiveSession({
     generation = useRef(0),
     mounted = useRef(true),
     running = useRef(false),
-    evaluating = useRef(false);
+    evaluating = useRef(false),
+    paused = useRef(false),
+    readySince = useRef(0),
+    resumeAt = useRef(0);
   const segmenter = useRef(new RepSegmenter(plan.exercise));
+  const [userPaused, setUserPaused] = useState(false);
   const [camera, setCamera] = useState(false),
     [loading, setLoading] = useState(false),
     [active, setActive] = useState(false);
@@ -193,8 +202,13 @@ export function LiveSession({
         setAccepted((n) => n + 1);
         running.current = true;
         setActive(true);
-      } else if (saved.label === "inconclusive") setPending((n) => n + 1);
+      } else {
+        if (saved.label === "inconclusive") setPending((n) => n + 1);
+        // Give the patient time to watch the replay before tracking resumes.
+        resumeAt.current = performance.now() + REPLAY_PAUSE_MS;
+      }
     } catch (e) {
+      resumeAt.current = performance.now() + REPLAY_PAUSE_MS;
       setError(
         e instanceof Error ? e.message : "The repetition could not be saved.",
       );
@@ -216,6 +230,7 @@ export function LiveSession({
     detector.current = null;
     if (recorder.current?.state === "recording") recorder.current.stop();
     segmenter.current.reset();
+    readySince.current = 0;
   };
 
   useEffect(() => {
@@ -280,7 +295,7 @@ export function LiveSession({
       await video.current!.play();
       setCamera(true);
       setFeedback(
-        "Find your starting position. Begin when all setup checks are ready.",
+        "Find your starting position. Tracking starts on its own once every setup check is ready.",
       );
       let lastSample = 0,
         lastVideo = -1;
@@ -353,6 +368,26 @@ export function LiveSession({
                 light: brightness > 35 && brightness < 245,
               };
               setChecks(setup);
+              // Start tracking on its own once every check has held steadily.
+              if (!running.current && !evaluating.current && !paused.current) {
+                const next = autoStart(
+                  readySince.current,
+                  setup.body && setup.light && setup.distance,
+                  now,
+                  resumeAt.current,
+                  READY_HOLD_MS,
+                );
+                readySince.current = next.readySince;
+                if (next.start) {
+                  segmenter.current.reset();
+                  running.current = true;
+                  setActive(true);
+                  setError("");
+                  setFeedback(
+                    "Tracking started. Return to your starting position between repetitions.",
+                  );
+                }
+              }
               if (running.current) {
                 // Poor tracking during an active rep must reach the classifier as uncertainty.
                 const wasActive = segmenter.current.active;
@@ -369,6 +404,7 @@ export function LiveSession({
               }
             } else {
               ctx?.clearRect(0, 0, 640, 480);
+              readySince.current = 0;
               setChecks({ body: false, distance: false, light: false });
               // Do not join movements on either side of a complete tracking loss.
               segmenter.current.reset();
@@ -491,32 +527,31 @@ export function LiveSession({
             </strong>
             <p>{feedback}</p>
           </div>
-          {camera && !active && (
+          {camera && !active && userPaused && (
             <button
               className="primary"
-              disabled={
-                !checks.body ||
-                !checks.light ||
-                !checks.distance ||
-                evaluating.current
-              }
               onClick={() => {
-                segmenter.current.reset();
-                running.current = true;
-                setActive(true);
-                setError("");
-                setFeedback(
-                  "Return to your starting position between repetitions.",
-                );
+                paused.current = false;
+                readySince.current = 0;
+                setUserPaused(false);
               }}
             >
-              {last ? "Try next rep" : "Begin set"} →
+              Resume →
             </button>
+          )}
+          {camera && !active && !userPaused && (
+            <span className="auto-start-hint">
+              {checks.body && checks.light && checks.distance
+                ? "Starting…"
+                : "Starts when all checks are ready"}
+            </span>
           )}
           {active && (
             <button
               className="secondary"
               onClick={() => {
+                paused.current = true;
+                setUserPaused(true);
                 running.current = false;
                 setActive(false);
                 segmenter.current.reset();
@@ -553,6 +588,9 @@ export function LiveSession({
             </p>
           </div>
         )}
+        <div className="panel steps-panel">
+          <ExerciseSteps exercise={plan.exercise} />
+        </div>
         {demo && (
           <div className="demo-controls">
             <strong>Explore the feedback</strong>

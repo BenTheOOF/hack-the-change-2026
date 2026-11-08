@@ -15,7 +15,22 @@ export interface RepClassifier {
     threshold: number,
   ): Evaluation;
 }
-export const MODEL_VERSION = "rules-1.0.0";
+export const MODEL_VERSION = "rules-1.1.0";
+// Rule thresholds. Keep in sync with backend/app/physio.py.
+// MediaPipe treats visibility >= 0.5 as visible; the lite model often rates
+// knees and ankles 0.6-0.85 even when they are clearly in frame.
+export const RULES = {
+  visible: 0.5,
+  squat: { rest: 155, move: 145, depthMin: 50, depthMax: 130 },
+  shoulder: { rest: 35, move: 40, peakMin: 70, peakMax: 130, asymmetry: 35 },
+  minTempoMs: 1000,
+  maxGapMs: 700,
+} as const;
+
+// Map mean joint visibility to a tracking confidence: 0.7+ is fully trusted,
+// 0.62 reaches the default 0.8 threshold, 0.5 stays uncertain.
+export const trackingConfidence = (visibility: number) =>
+  Math.max(0, Math.min(1, (visibility - 0.3) / 0.4));
 export const EXERCISES = {
   squat: {
     name: "Bodyweight squat",
@@ -23,6 +38,13 @@ export const EXERCISES = {
     focus: "Lower body · Control",
     instruction:
       "Stand side-on to the camera with your feet, hips and shoulders visible. Use the comfortable range prescribed by your therapist.",
+    steps: [
+      "Place the camera at hip height, 2 to 3 metres away, and stand side-on so your whole body is in view.",
+      "Stand tall with feet hip-width apart and knees straight.",
+      "Push your hips back and bend your knees as if sitting into a chair. Keep your chest up and heels down.",
+      "Go only as low as is comfortable, roughly until your thighs point down at an angle.",
+      "Stand back up slowly until your knees are straight. Take about two seconds for the whole rep.",
+    ],
   },
   shoulder_abduction: {
     name: "Standing shoulder abduction",
@@ -30,6 +52,13 @@ export const EXERCISES = {
     focus: "Upper body · Mobility",
     instruction:
       "Face the camera with both arms in view. Raise your arms out to the sides within your prescribed range, then lower slowly.",
+    steps: [
+      "Place the camera at chest height, 2 to 3 metres away, and face it so your head, arms and hips are in view.",
+      "Stand tall with your arms relaxed by your sides and palms facing in.",
+      "Raise both arms out to the sides together, elbows straight, up to about shoulder height.",
+      "Pause briefly without shrugging your shoulders.",
+      "Lower both arms slowly back to your sides. Take about two seconds for the whole rep.",
+    ],
   },
 } as const;
 
@@ -102,12 +131,14 @@ export const ruleClassifier: RepClassifier = {
     const values = frames.map((f) =>
       measure(exercise, f.points, f.aspect_ratio),
     );
-    let quality = values.reduce((s, v) => s + v.quality, 0) / values.length;
+    let quality = trackingConfidence(
+      values.reduce((s, v) => s + v.quality, 0) / values.length,
+    );
     if (
       duration < 600 ||
       duration > 15000 ||
-      Math.min(...values.map((v) => v.quality)) < 0.35 ||
-      frames.some((f, i) => i > 0 && f.t - frames[i - 1].t > 500)
+      Math.min(...values.map((v) => v.quality)) < 0.2 ||
+      frames.some((f, i) => i > 0 && f.t - frames[i - 1].t > RULES.maxGapMs)
     )
       quality = Math.min(quality, 0.5);
     if (quality < threshold)
@@ -118,23 +149,30 @@ export const ruleClassifier: RepClassifier = {
         "Keep your whole body visible. Your therapist can review this rep.",
       );
     const angles = values.map((v) => v.angle);
+    const { squat, shoulder } = RULES;
     const complete =
       exercise === "squat"
-        ? angles[0] >= 155 && angles.at(-1)! >= 160 && Math.min(...angles) < 150
-        : angles[0] <= 35 && angles.at(-1)! <= 30 && Math.max(...angles) > 40;
+        ? angles[0] >= squat.rest &&
+          angles.at(-1)! >= squat.rest &&
+          Math.min(...angles) < squat.move
+        : angles[0] <= shoulder.rest &&
+          angles.at(-1)! <= shoulder.rest &&
+          Math.max(...angles) > shoulder.move;
     let error: string | null = null,
       feedback = "";
     if (exercise === "squat") {
       const depth = Math.min(...angles);
-      if (depth > 115 || depth < 55) error = "range_of_motion";
+      if (depth > squat.depthMax || depth < squat.depthMin)
+        error = "range_of_motion";
       feedback =
         "Try the comfortable squat depth prescribed by your therapist.";
     } else {
       const height = Math.max(...angles);
-      if (height < 75 || height > 115) error = "range_of_motion";
+      if (height < shoulder.peakMin || height > shoulder.peakMax)
+        error = "range_of_motion";
       feedback =
         "Raise your arms to the height prescribed by your therapist, then lower slowly.";
-      if (Math.max(...values.map((v) => v.asymmetry)) > 30) {
+      if (Math.max(...values.map((v) => v.asymmetry)) > shoulder.asymmetry) {
         error = "uneven_movement";
         feedback = "Move both arms together within your prescribed range.";
       }
@@ -146,7 +184,7 @@ export const ruleClassifier: RepClassifier = {
         Math.min(quality, 0.6),
         "Return to the starting position to finish a full rep.",
       );
-    if (duration < 1200) {
+    if (duration < RULES.minTempoMs) {
       error = "tempo";
       feedback = "Slow down and move smoothly through the repetition.";
     }
@@ -160,6 +198,22 @@ export const ruleClassifier: RepClassifier = {
         );
   },
 };
+
+// Decide when tracking may start on its own: every setup check must hold for
+// holdMs, and any post-rep replay pause must be over. readySince 0 means "not ready".
+export function autoStart(
+  readySince: number,
+  ready: boolean,
+  now: number,
+  resumeAt: number,
+  holdMs = 1500,
+): { readySince: number; start: boolean } {
+  if (!ready) return { readySince: 0, start: false };
+  if (!readySince) return { readySince: now, start: false };
+  if (now - readySince >= holdMs && now >= resumeAt)
+    return { readySince: 0, start: true };
+  return { readySince, start: false };
+}
 
 export class RepSegmenter {
   private frames: PoseFrame[] = [];
@@ -184,21 +238,25 @@ export class RepSegmenter {
       frame.points,
       frame.aspect_ratio,
     );
-    const resting = this.exercise === "squat" ? angle >= 160 : angle <= 30;
-    const moving = this.exercise === "squat" ? angle < 150 : angle > 40;
+    const { squat, shoulder, visible } = RULES;
+    const resting =
+      this.exercise === "squat" ? angle >= squat.rest : angle <= shoulder.rest;
+    const moving =
+      this.exercise === "squat" ? angle < squat.move : angle > shoulder.move;
     if (!this.frames.length) {
-      if (quality >= 0.6 && resting) {
+      if (quality >= visible && resting) {
         this.ready = [...this.ready.slice(-2), frame];
-      } else if (quality >= 0.6 && moving && this.ready.length >= 2) {
+      } else if (quality >= visible && moving && this.ready.length >= 2) {
         this.frames = [...this.ready, frame];
         this.ready = [];
-      } else if (quality < 0.6) {
+      } else if (quality < visible) {
         this.ready = [];
       }
       return null;
     }
     this.frames.push(frame);
-    this.restingFrames = resting && quality >= 0.6 ? this.restingFrames + 1 : 0;
+    this.restingFrames =
+      resting && quality >= visible ? this.restingFrames + 1 : 0;
     if (this.frames.length > 180 || frame.t - this.frames[0].t > 15000) {
       this.reset();
       return null;

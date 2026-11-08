@@ -21,6 +21,7 @@ Live Supabase sign-up/sign-in, the Storage HTTP service, actual camera capture, 
 - `uv run --group ml pytest`: 7 passed.
 - Frontend `npm run typecheck`, `npm test` (3 passed), and `npm run build` passed on Node 22.
 - Camera fix: the ignored `public/mediapipe/` assets had never been generated, so pose tracking failed after camera permission. `predev` and `prebuild` now run `pose:setup`. In the browser, the local WASM and lite pose model loaded and `PoseLandmarker.detectForVideo` ran. Blocked, missing, busy, and insecure-origin camera cases now show plain instructions. A live camera feed was not tested because the in-app browser blocks camera access.
+- rules-1.1.0: new Node and pytest cases show a 120 degree squat and a 72 degree shoulder raise at 0.7 visibility now count, where rules-1.0.0 sent them to review. A pure `autoStart` helper is tested for the 1.5 s hold and the 3 s replay pause. Auto-start with a live camera was not tested because the in-app browser blocks camera access.
 - The demo was checked at 1440 px and 375 px: correct, incorrect, and uncertain simulated reps, the replay auto-scroll, today's target in the session panel, and the therapist flag reason. No horizontal overflow at 375 px. No console errors.
 
 The local Git metadata was initially empty. Main-branch history was recovered from the connected repository without overwriting implementation files. Work is on feat/physiotrace. Nothing was pushed or deployed.

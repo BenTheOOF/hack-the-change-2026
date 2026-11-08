@@ -29,3 +29,15 @@ The offline `ml` group installs one accelerator stack per platform: CUDA 12.8 Py
 ## 2026-11-07: frontend legibility and rep result feedback
 
 Patients may read the screen from a distance during exercise, so the minimum text size was raised (most labels went from 8 to 10 px and 10 px text went to 12 px) and the font stack now starts with the platform UI font. The live session shows the latest rep result in a tinted banner, and an incorrect or uncertain rep scrolls its replay into view, matching the "pause and replay the last rep" routing rule. The session side panel shows today's accepted reps against the prescribed target. Arrows that looked like links on non-interactive cards were removed.
+
+## 2026-11-07: recalibrate the rule baseline (rules-1.1.0)
+
+Real sessions sent most good reps to review or marked them not counted. Confidence was the raw MediaPipe visibility of the weakest joint, compared against 0.8, and the lite pose model often reports 0.6 to 0.85 for knees and ankles that are clearly in frame. Confidence is now `(visibility - 0.3) / 0.4`, clamped to 0..1, so 0.7 visibility is fully trusted, 0.62 meets the default 0.8 threshold, and 0.5 still goes to review. Prescribed thresholds and the database default are unchanged. The single-frame drop-out cap moved from 0.35 to 0.2 visibility and the frame-gap cap from 500 to 700 ms. Segmentation gates on visibility 0.5, MediaPipe's own visible cut-off.
+
+Ranges were widened for rehabilitation patients: squat knee angle at the bottom 50 to 130 degrees (was 55 to 115), standing at 155 or more (was 160); shoulder abduction peak 70 to 130 degrees (was 75 to 115), rest at 35 or less (was 30), asymmetry limit 35 degrees (was 30); minimum rep time 1.0 s (was 1.2 s). Browser and backend share the same constants and the version is now `rules-1.1.0`. These are still prototype defaults that need therapist validation.
+
+Training from YouTube videos was requested and declined. The project rules forbid scraping YouTube or other websites, and downloading its videos breaks its terms. Calibration data should come from licensed rehab datasets (UI-PRMD, KIMORE after a license check), the team's own recorded reps, or therapist-accepted reps from patients with training consent.
+
+## 2026-11-07: automatic start and visible instructions
+
+Tracking starts on its own once body-in-frame, lighting, and distance checks have held for 1.5 s, replacing the Begin set button. After an incorrect or uncertain rep it waits 3 s for the replay, then resumes when the checks hold again. Pause stops automatic restarts until the patient presses Resume. Step-by-step instructions for each exercise appear on the Today page cards and below the camera in the session.

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  autoStart,
   demoFrame,
   jointAngle,
   RepSegmenter,
@@ -72,4 +73,29 @@ test("shoulder abduction completes only after the arms return", () => {
     ruleClassifier.classify("shoulder_abduction", reps[0]!, 0.8).label,
     "correct",
   );
+});
+
+test("typical lite-model tracking and a moderate rehab squat count", () => {
+  // Knees and ankles often report about 0.7 visibility while clearly in frame.
+  const moderate = sequence("squat", [175, 165, 145, 125, 120, 140, 165, 175], 0.7);
+  const result = ruleClassifier.classify("squat", moderate, 0.8);
+  assert.equal(result.label, "correct");
+  assert.ok(result.confidence >= 0.8);
+  const raise = sequence("shoulder_abduction", [10, 25, 50, 72, 50, 25, 10], 0.7);
+  assert.equal(
+    ruleClassifier.classify("shoulder_abduction", raise, 0.8).label,
+    "correct",
+  );
+});
+
+test("tracking starts only after every check holds and the replay pause ends", () => {
+  let state = autoStart(0, true, 1000, 0);
+  assert.deepEqual(state, { readySince: 1000, start: false });
+  assert.equal(autoStart(state.readySince, true, 2000, 0).start, false);
+  assert.deepEqual(autoStart(0, false, 2400, 0), { readySince: 0, start: false });
+  assert.equal(autoStart(state.readySince, true, 2600, 0).start, true);
+  // After an incorrect rep the replay pause delays the restart.
+  state = autoStart(state.readySince, true, 2600, 4000);
+  assert.equal(state.start, false);
+  assert.equal(autoStart(state.readySince, true, 4000, 4000).start, true);
 });

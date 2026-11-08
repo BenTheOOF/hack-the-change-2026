@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
 import {
   EXERCISES,
+  MODEL_VERSION,
   demoFrame,
   type Evaluation,
   type PoseFrame,
 } from "./engine";
+import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
 import { PoseReplay } from "./pose-replay";
 import type { Overview, Prescription, Profile, Rep, Review } from "./types";
@@ -208,7 +210,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           error_type: "tracking",
           confidence: 0.5,
           feedback: "Tracking was uncertain.",
-          model_version: "rules-1.0.0",
+          model_version: MODEL_VERSION,
           frames: sampleFrames,
         },
       ]);
@@ -855,6 +857,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                                   ? "Build a steady foundation, one controlled movement at a time."
                                   : "Find a little more freedom in every comfortable reach.")}
                             </p>
+                            <ExerciseSteps exercise={plan.exercise} />
                             <div className="exercise-progress">
                               <span>
                                 {count}{" "}

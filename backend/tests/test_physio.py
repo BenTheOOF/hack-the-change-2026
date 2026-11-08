@@ -33,6 +33,8 @@ def test_rule_routing_and_incomplete_reps() -> None:
     assert classify("squat", frames([175, 165, 145, 135, 145, 165, 175])).label == "incorrect"
     assert classify("squat", frames([175, 165, 130, 95, 120, 165, 175], 0.5)).label == "inconclusive"
     assert classify("squat", good[:4]).label == "inconclusive"
+    # Typical lite-model visibility and a moderate rehab depth both count.
+    assert classify("squat", frames([175, 165, 145, 125, 120, 140, 165, 175], 0.7)).label == "correct"
     good[-1].t = good[-2].t
     assert classify("squat", good).label == "inconclusive"
     with pytest.raises(ValidationError):
