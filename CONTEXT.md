@@ -4,6 +4,8 @@ Read this before changing anything. Rules for changes are in `.coding-standards`
 
 ## What this repo is
 
+PhysioTrace is now implemented on this starter. Patient and therapist workflows live in frontend/src/features/physio, protected care routes in backend/app/routers/physio.py, and the deterministic baseline in backend/app/physio.py. The approved proposal and implementation decisions are in docs/architecture.md and docs/decisions.md. Training is disabled. The optional uv `ml` group installs CUDA PyTorch on Windows and Linux and MLX on Apple Silicon; `backend/check_accelerator.py` checks it. The remaining sections describe the starter infrastructure retained by the implementation.
+
 A starter for a four-person hackathon team. Sign-in, a database, file storage, realtime and an LLM endpoint are wired up. Teams replace the example pages with their own idea.
 
 ## Stack
@@ -14,7 +16,7 @@ A starter for a four-person hackathon team. Sign-in, a database, file storage, r
 | API | FastAPI, uv | `backend`, deployed to Fly (one 256MB machine, stops when idle) |
 | Data | Supabase: Postgres, Auth, Storage, Realtime | `backend/supabase/` |
 | Auth | Email and password only | |
-| LLM | Anthropic Messages API, called from the API only | `backend/app/routers/ai.py` |
+| LLM | Any OpenAI-compatible Chat Completions provider (Gemini by default), called from the API only | `backend/app/routers/ai.py` |
 
 Coolify, n8n, PocketBase and Appwrite were left out on purpose because they overlap with Supabase, Vercel and Fly.
 
@@ -35,7 +37,7 @@ Coolify, n8n, PocketBase and Appwrite were left out on purpose because they over
 - Next.js 16 calls the middleware file `proxy.ts`. On Next.js 15 or older it is `middleware.ts`.
 - Use `getClaims()` to check a session on the server. Do not use `getSession()` for that.
 - `.env` uses `127.0.0.1` for the API, because Node can resolve `localhost` to IPv6 and miss it.
-- `LLM_MODEL` is empty on purpose. Copy a current model id from the provider docs. Do not invent one. The `anthropic-version` header value is in `ai.py`.
+- `LLM_MODEL` is empty on purpose. Copy a current model id from the provider docs. Do not invent one. `LLM_BASE_URL` picks the provider; `ai.py` posts to `{LLM_BASE_URL}/chat/completions` with the key as a Bearer token.
 - Email confirmation is off for the hackathon. With it on, sign-up returns no session and the user goes back to `/login`.
 - `frontend/AGENTS.md` is git-ignored.
 - The Supabase CLI looks for `supabase/` upward from the folder you run it in, so run it from `backend/`. `supabase db push` targets a local database unless you pass `--remote`.

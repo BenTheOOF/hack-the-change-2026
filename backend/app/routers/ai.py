@@ -17,8 +17,8 @@ class ChatIn(BaseModel):
 
 @router.post("/ai/chat")
 async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
-    if not settings.llm_api_key or not settings.llm_model:
-        raise HTTPException(503, "Set ANTHROPIC_API_KEY and LLM_MODEL in .env")
+    if not settings.llm_api_key or not settings.llm_base_url or not settings.llm_model:
+        raise HTTPException(503, "Set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL in .env")
 
     async with httpx.AsyncClient(timeout=60) as client:
         # Counts the request before calling the LLM, so failed calls use up the quota too.
@@ -33,12 +33,12 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
         if usage.json() > DAILY_LIMIT:
             raise HTTPException(429, f"Daily limit of {DAILY_LIMIT} requests reached")
 
+        # OpenAI-compatible Chat Completions, which OpenAI, Gemini, OpenRouter, Groq, Mistral and
+        # Ollama all accept. The provider is chosen by LLM_BASE_URL. max_tokens is the widely
+        # supported limit field; OpenAI's reasoning models want max_completion_tokens instead.
         r = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": settings.llm_api_key,
-                "anthropic-version": "2026-10-21",
-            },
+            f"{settings.llm_base_url.rstrip('/')}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
             json={
                 "model": settings.llm_model,
                 "max_tokens": settings.llm_max_tokens,
@@ -47,5 +47,9 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
         )
     if r.status_code != 200:
         raise HTTPException(502, "The LLM provider returned an error")
-    blocks = r.json()["content"]
-    return {"reply": "".join(b["text"] for b in blocks if b["type"] == "text")}
+    choices = r.json().get("choices") or []
+    content = choices[0].get("message", {}).get("content") if choices else None
+    # Some providers return content as a list of parts instead of a string.
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return {"reply": content or ""}

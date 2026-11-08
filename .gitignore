@@ -72,3 +72,7 @@ backend/supabase/.branches/
 
 # ---------- Project-specific ----------
 frontend/AGENTS.md
+
+# Workspace-local tool downloads and caches.
+.tools/
+frontend/public/mediapipe/

@@ -14,8 +14,8 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 - Pose estimation: MediaPipe Pose Landmarker, run **in the browser**
 - Backend: Python, FastAPI
 - Database: PostgreSQL
-- Clip storage: S3-compatible object storage (MinIO in dev)
-- ML: Python (PyTorch / scikit-learn), offline training only
+- Clip storage: existing private Supabase Storage (approved implementation choice)
+- ML: Python, offline training only. Accelerator is CUDA PyTorch (Windows/Linux) or MLX (Apple Silicon), never CPU-only torch
 
 ## Repo layout
 <!-- Update as the project grows -->
@@ -26,10 +26,12 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 
 ## Commands
 <!-- Fill in once set up -->
-- Frontend dev: `TODO`
-- Backend dev: `TODO`
-- Tests: `TODO`
-- Lint/format: `TODO`
+- Frontend dev: `cd frontend && npm run dev`, or `scripts/frontend.ps1` on Windows
+- Backend dev: `cd backend && uv run uvicorn app.main:app --reload`, or `scripts/backend.ps1` on Windows
+- ML accelerator check: `cd backend && uv sync --group ml && uv run --group ml python check_accelerator.py`
+- Custom-exercise trainer: `scripts/worker.sh` (or `scripts/worker.ps1`); runs `ml/worker.py`, which fits queued therapist exercises offline
+- Tests: `cd frontend && npm test && npm run typecheck`; `cd backend && uv run pytest`
+- Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup` (runs automatically before dev and build)
 
 ## Core architecture
 Classify **pose keypoint sequences**, never raw video frames:
@@ -86,4 +88,20 @@ without changes elsewhere.
 
 ## Current status
 <!-- Update as phases complete -->
-- Phase 0: not started (architecture + data model proposal)
+- Phase 0: architecture and data proposal approved by the user.
+- Phase 1: care schema, RLS, and protected API implemented.
+- Phase 2: browser pose session, baseline classifier, history, and daily targets implemented.
+- Phase 3: assigned therapist queue, prescriptions, review corrections, and feedback implemented.
+- Phase 4 (2026-11-07): offline ML accelerator is CUDA PyTorch (Windows/Linux) or MLX (Apple Silicon) via the optional uv `ml` group; `backend/check_accelerator.py` verifies it with no CPU fallback. MLX verified on an Apple GPU.
+- Phase 4 frontend polish: larger minimum type and system font stack, live-session result banner (counted / adjust / sent for review), incorrect-rep replay scrolls into view, daily target progress inside the session, flag reason shown to the therapist, decorative arrows removed.
+- Phase 5 (2026-11-07): rule baseline recalibrated to `rules-1.1.0` (visibility-based confidence rescaled, wider rehab ranges) in both browser and backend; tracking auto-starts when setup checks hold; step-by-step instructions on the Today page and in the session.
+- Phase 6 (2026-11-07): therapist review plays the real rep video (skeleton overlay toggle) when the patient shares clips; patients rewatch every rep's video in history from on-device IndexedDB storage; auto-start hold is 2 s with a countdown.
+- Demo data persists in this browser across refreshes (localStorage plus on-device clips) until "Clear demo data" is used.
+- Rep clips include 1.5 to 3 s of lead-in and 0.5 s after the rep; the saved pose is aligned to the video and classification ignores the extra lead-in.
+- Live session has a movement gauge beside the camera (target band from the classifier rules, peak marker, cue).
+- Phase 7 (2026-11-07): therapists add their own exercises with an uploaded or recorded demo video. Pose keypoints are extracted in the browser; the offline worker (`ml/worker.py`) fits a template model (`template-1.0.0`) and marks it ready; the API re-checks custom reps with it. Migration `20261108020000_custom_exercises.sql`. The demo fits in the browser with the TypeScript port.
+- Demo videos can be trimmed before training (start/end stored with the exercise; players loop that part).
+- Distance setup check uses torso length (works facing the camera, side-on, and seated); therapist workspace has Review queue, Patients & plans, and Your exercises sections; prescriptions confirm inline.
+- Pose tracking uses MediaPipe's full model (better for push-ups and floor work) and keeps a rep through misses of up to 600 ms.
+- Template fits `template-1.1.0`: side-on demos follow the visible side and match patients facing either way; rest is found from both ends of the clip.
+- Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

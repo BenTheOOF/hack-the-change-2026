@@ -10,14 +10,19 @@ async def get_current_user(authorization: str = Header(default="")) -> dict:
     Supabase checks the token for us, so the API needs no JWT secret.
     Use it in any route: `user: dict = Depends(get_current_user)`.
     """
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
         raise HTTPException(401, "Missing bearer token")
-    async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.get(
-            f"{settings.supabase_url}/auth/v1/user",
-            headers={"apikey": settings.supabase_publishable_key, "Authorization": f"Bearer {token}"},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                f"{settings.supabase_url}/auth/v1/user",
+                headers={"apikey": settings.supabase_publishable_key, "Authorization": f"Bearer {token.strip()}"},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(503, "Sign-in verification is unavailable.") from exc
+    if r.status_code >= 500:
+        raise HTTPException(503, "Sign-in verification is unavailable.")
     if r.status_code != 200:
         raise HTTPException(401, "Invalid or expired token")
     return r.json()

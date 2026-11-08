@@ -1,197 +1,121 @@
-# Hackathon starter
+# PhysioTrace
 
-A Next.js web app (Vercel), a FastAPI API (Fly.io) and a Supabase project, already connected. Follow the sections below from top to bottom.
-At the end you have it running locally and deployed.
+Private exercise feedback for physiotherapy patients, with a review loop for their physical therapist.
 
-## Layout
+The implemented MVP includes bodyweight squat and standing shoulder abduction, browser pose tracking and skeleton overlay, complete-rep segmentation, a versioned rule classifier, daily targets and history, therapist prescriptions, a review queue, and patient feedback. An uncertain rep counts only after an assigned therapist accepts it.
 
+No training has been run. The optional offline ML group uses CUDA PyTorch on Windows and Linux and MLX on Apple Silicon. The app uses a rule baseline, not a trained exercise classifier.
+
+## Run the implementation on this Windows workspace
+
+The local tools are already downloaded under the ignored `.tools/` folder, and dependencies are installed.
+
+Open two PowerShell terminals at the repository root:
+
+```powershell
+.\scripts\backend.ps1
 ```
-frontend/           Next.js 16 web app. Deployed to Vercel.
-backend/            FastAPI API. Deployed to Fly.
-backend/supabase/   Database migrations. Run the Supabase CLI from backend/.
-scripts/            dev.sh, push-env and the worktree scripts. Run them from the repo root.
-docs/               OWNERSHIP.md lists who works in which folder.
-.env                Not in git. One file for both sides, in the repo root.
+
+```powershell
+.\scripts\frontend.ps1
 ```
 
-`frontend/README.md` and `backend/README.md` have the setup and run steps for each side on its own. Before you change code, read `CONTEXT.md` and `.coding-standards`.
+Open [the interactive demo](http://127.0.0.1:3000/demo). It needs no account and never uploads anything. Demo reps, feedback, and clips are saved in this browser across refreshes until you press Clear demo data. Use the Patient and Therapist switches to exercise the entire feedback loop. Simulated good, incorrect, and uncertain reps work without camera access.
 
-## Prerequisites
+The backend script creates the single root `.env` from `.env.example` if it is missing. Fill in the Supabase values to use saved care records. The landing page and demo work with blank values. Camera use requires HTTPS or localhost and explicit browser permission. Opening the dev server from a phone at the LAN address over plain HTTP will not expose the camera. The in-app browser of some editors blocks the camera, so test live sessions in Chrome, Edge, Safari, or Firefox.
 
-1. Install Node.js 20.9 or newer from nodejs.org. Check: `node -v` prints `v20.9.0` or higher.
-2. Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`. Check: `uv --version`.
-3. Install git. Check: `git --version`.
-4. Install the Fly CLI: `curl -L https://fly.io/install.sh | sh`. Check: `fly version`.
-5. Install the Vercel CLI: `npm i -g vercel`. Check: `vercel --version`.
-6. Make accounts at Supabase, Fly.io, Vercel and the Anthropic Console. Fly asks for a card.
+## Run on macOS or Linux
 
-## Create the Supabase project
+```bash
+cp -n .env.example .env
+cd backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-1. In the Supabase dashboard click New project. Choose a name, a region and a database password. Save the password.
-2. Wait until the project is ready. Expected: the project dashboard opens.
-3. Note the project ref, the text between `https://` and `.supabase.co` in the project URL.
-4. Open Project Settings, then API Keys. Expected: a publishable key (`sb_publishable_...`) and a secret key (`sb_secret_...`). Keep the tab open.
+```bash
+cd frontend && npm ci && npm run dev
+```
 
-## Fill in .env
+## Set up a fresh checkout
 
-1. In the repo root, copy `.env.example` to `.env` with `cp .env.example .env`. If you have no `.env.example`, create `.env` with the names in the table below.
-2. Fill in these values:
-   - `NEXT_PUBLIC_SUPABASE_URL`: the Connect button at the top of the dashboard shows it.
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Project Settings, API Keys, publishable key.
-   - `SUPABASE_SECRET_KEY`: Project Settings, API Keys, secret key.
-   - `ANTHROPIC_API_KEY`: create one in the Anthropic Console. You can leave it empty for now.
-   - `LLM_MODEL`: copy a model id from the provider docs. You can leave it empty for now.
-3. Leave the rest as it is. Expected: only the two LLM lines may be empty.
+Install Node.js 24 LTS and uv. Keep exactly one `.env` at the repository root.
 
-`.env` is the only env file in the repo and it is git-ignored.
+```powershell
+Copy-Item .env.example .env
+cd backend
+uv python install 3.12.16
+uv sync
+cd ..\frontend
+npm ci
+npm run pose:setup
+```
 
-| Name | Read by | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | frontend, backend | Your project URL. |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | frontend, backend | `sb_publishable_...` |
-| `SUPABASE_SECRET_KEY` | backend only | `sb_secret_...`. Never sent to the browser. |
-| `CORS_ORIGINS` | backend | Comma-separated page origins. Locally `http://localhost:3000`. |
-| `NEXT_PUBLIC_API_URL` | frontend | Locally `http://127.0.0.1:8000`. |
-| `ANTHROPIC_API_KEY`, `LLM_MODEL` | backend | Empty is fine. `/ai/chat` then returns 503. |
-| `LLM_MAX_TOKENS` | backend | Defaults to 512. |
-| `API_PORT`, `WEB_PORT` | `scripts/dev.sh`, `scripts/worktree.sh` | Default 8000 and 3000. Keep both lines in `.env`: `worktree.sh` only rewrites lines that exist. |
+The pose setup copies the installed MediaPipe WASM runtime and downloads the pinned pretrained pose detector from Google. It does not download training data or train a model. Run it again after changing the MediaPipe package version.
 
-## Apply migrations
+For the offline ML accelerator (CUDA or MLX):
 
-Run the Supabase CLI from `backend/`, the folder that contains `supabase/`. The CLI looks for `supabase/` upward from where you run it, so it will not find it from the repo root.
+```bash
+cd backend
+uv sync --group ml
+uv run --group ml python check_accelerator.py
+```
 
-1. Run `cd backend`, then `npx supabase login`. Expected: the CLI says you are logged in.
-2. Run `npx supabase link --project-ref YOUR_PROJECT_REF` and enter the database password. Expected: the CLI says the project is linked.
-3. Run `npx supabase db push --remote` and answer `y`. Without `--remote` the command targets a local database. Expected: four migration files are applied with no errors.
-4. In the dashboard open Table Editor. Expected: `profiles`, `notes` and `ai_usage`. Open Storage. Expected: a private bucket named `uploads`.
+`backend/.python-version` pins uv-managed Python 3.12.16. `backend/uv.lock` locks the dependencies. The optional `ml` group installs NumPy plus one accelerator stack per platform:
 
-## Disable email confirmation for the hackathon
+| Platform | Stack | Device |
+| --- | --- | --- |
+| Windows, Linux | PyTorch from the explicit CUDA 12.8 index | `cuda` |
+| macOS on Apple Silicon | MLX | Apple GPU through Metal |
 
-1. In the dashboard open Authentication, then Sign In / Providers, then Email.
-2. Turn off Confirm email and save. The label can differ slightly between dashboard versions.
-3. Expected: a new user can sign up and reach the dashboard without opening an email.
+`check_accelerator.py` picks CUDA first, then MLX, and exits non-zero when neither is usable. There is no CPU fallback. The API and production image do not need the `ml` group. A CUDA check needs an accessible NVIDIA GPU and driver; installing the wheel does not install or change a driver. Intel Macs have no supported accelerator.
 
-## Run locally
+## Therapist-defined exercises
 
-Both sides together:
+Therapists can add their own exercises from the workspace with an uploaded or recorded demo video, then trim it to the part with two or more reps (2 to 60 s, starting and ending at rest). Only that part is used for the model, and patients see it looped. Pose keypoints are extracted in the browser, and a background trainer fits a model:
 
-1. In the repo root run `./scripts/dev.sh`. Expected: the first run installs dependencies, then uvicorn starts on port 8000 and Next.js on port 3000.
-2. Open `http://localhost:3000`. Expected: a home page with Sign up, Log in and Dashboard links.
-3. Press Ctrl+C to stop both servers.
+```bash
+scripts/worker.sh
+```
 
-One side at a time: `frontend/README.md` and `backend/README.md` list the commands. The dashboard shows "Could not reach the API" if you start only the frontend.
+On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exercises every 5 seconds, and marks each one Ready or Failed with a reason shown to the therapist. Ready exercises can be prescribed like the built-in ones. The demo needs no worker: it fits the model in the browser right away.
 
-## Checklist: confirm every feature works
+## Connect Supabase
 
-Run `./scripts/dev.sh`, then go through these in order.
+1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the backend-only `SUPABASE_SECRET_KEY` in the root `.env`. Keep the existing key names.
+2. Apply the migrations from `backend/supabase/migrations/` to your intended local or linked project using the Supabase CLI. No remote migration is applied automatically by this implementation.
+3. Sign up patient and therapist accounts. Every account starts as a patient. Never grant roles from signup metadata.
+4. Run `backend/supabase/admin-care.sql` with database-administrator access and the two auth user IDs to grant the therapist role and establish an assignment. This changes data, not schema.
+5. The therapist signs in at `/dashboard` and prescribes an exercise, date range, daily target, confidence threshold, and movement cue. The patient sees that plan after refreshing.
 
-1. Open `http://127.0.0.1:8000/health`. Expected: `{"status":"ok"}`.
-2. Open `http://localhost:3000/dashboard` while signed out. Expected: you land on `/login`.
-3. Go to `/signup`, enter an email and a password of 6 or more characters, and submit. Expected: you land on `/dashboard`.
-4. Read the line "API says". Expected: JSON with your user id and email.
-5. In Supabase open Table Editor, then `profiles`. Expected: one row with your email.
-6. Open the dashboard in two browser tabs and add a note in one. Expected: it appears in the other within a couple of seconds.
-7. Send a message under "Ask the LLM". Expected: a reply. If you left the LLM values empty, expected: a message asking you to set `ANTHROPIC_API_KEY` and `LLM_MODEL`.
-8. Click Files, choose a small file and click Upload. Expected: its name appears in the list.
-9. Click Log out, then open `/dashboard`. Expected: you land on `/login`.
-10. Run `cd backend && uv run pytest`. Expected: `1 passed`.
-11. Run `cd frontend && npm run typecheck`. Expected: no output after the `tsc --noEmit` line.
+Use the Supabase CLI from `backend/`. Retain the starter's private storage, RLS, and email/password setup. Native Supabase auth, private storage URLs, and a live camera must still be verified against your configured project.
 
-## Deploy the API to Fly
+## Privacy and safety
 
-1. Run `fly auth login`. Expected: you are logged in.
-2. Run `fly apps create YOUR-API-NAME`. Expected: the CLI confirms the app exists.
-3. In `backend/fly.toml` replace `CHANGE-ME` with that name.
-4. From the repo root run `scripts/push-env fly`. Expected: Fly lists the imported secrets.
-5. Run `cd backend && fly deploy`. Expected: the build finishes and a machine starts.
-6. Run `curl https://YOUR-API-NAME.fly.dev/health`. Expected: `{"status":"ok"}`. The first call after a quiet period takes a few seconds while the machine wakes.
+Pose processing runs in the browser. The API verifies deterministic pose checks before recording results. Raw video is held only in a bounded local memory buffer, and uncertain clips upload only with separate review consent. Training consent is independent and off by default. A therapist can access only assigned patients.
 
-## Deploy the web app to Vercel
+Revoking review consent hides shared clips; existing signed URLs expire within 60 seconds. Revoking training consent removes dataset membership and opts prior reps out of future exports. Offline dataset version functions exist, but labels never trigger exports or training.
 
-1. Run `vercel login`. Expected: you are logged in.
-2. Run `cd frontend && vercel link` and create a new project. Expected: a `.vercel` folder appears in `frontend`.
-3. From the repo root run `scripts/push-env vercel https://YOUR-API-NAME.fly.dev`. Expected: three production variables are added.
-4. Run `cd frontend && vercel --prod`. Expected: the CLI prints your production URL.
-5. From the repo root run `scripts/push-env fly https://YOUR-PROJECT.vercel.app` with that URL. Expected: Fly updates `CORS_ORIGINS` and restarts.
-6. Open the Vercel URL and sign up. Expected: the dashboard shows the "API says" line.
+The baseline uses prototype joint-angle ranges and tracking visibility as its confidence score. It needs therapist validation before clinical use. Stop if you feel pain. PhysioTrace supports physical therapy care and does not replace a clinician.
 
-If you connect the git repo to Vercel instead of using the CLI, set Root Directory to `frontend`.
+## Verify
 
-## Set the Supabase Site URL and redirect URLs
+```powershell
+cd frontend
+npm run typecheck
+npm test
+npm run build
+cd ..\backend
+uv run pytest
+```
 
-1. In the dashboard open Authentication, then URL Configuration.
-2. Set Site URL to your Vercel production URL.
-3. Under Redirect URLs add `https://YOUR-PROJECT.vercel.app/**` and `http://localhost:*/**`. If the second pattern does not match in your project, add each local port, for example `http://localhost:3001/**`.
-4. Save. Expected: both entries are listed.
+`uv run pytest` syncs only the default groups. Use `uv run --group ml pytest` to preserve an installed CUDA or MLX environment. The seven backend tests cover routing, authentication, role checks, replay-safe submission, review validation, and secret-header handling. Three Node tests cover both exercise state machines and confidence routing.
 
-## The 4-person workflow
+For the disposable PostgreSQL checks, install a local verification runtime without changing app dependencies:
 
-1. One person pushes the repo to GitHub: `git init && git add -A && git commit -m "Starter" && git push`. Everyone else clones it.
-2. Share the filled-in `.env` privately. Never commit it.
-3. From the main checkout each person runs `scripts/worktree.sh <name>`. Expected: a folder `../<repo>-<name>` on branch `feat/<name>`, with its own ports (3001 and 8001 for the first, 3002 and 8002 for the next), a matching API URL, and dependencies installed.
-4. In that folder run `./scripts/dev.sh`.
-5. After the branch merges, run `scripts/worktree-remove.sh <name>` from the main checkout.
-6. Fill in the real names in `docs/OWNERSHIP.md`. Touch shared files only in small PRs, and rebase before merging.
+```powershell
+npm install --prefix .tools/verification --no-audit --no-fund @electric-sql/pglite
+node scripts/check-care-db.mjs .tools/verification/node_modules/@electric-sql/pglite/dist/index.js
+```
 
-Everyone shares one hosted Supabase project. Change the schema only through git:
+These checks execute the migration and test RLS, role protection, retry idempotency, review correction, and consent revocation. They never connect to Supabase or train a model.
 
-1. From `backend/`, run `npx supabase migration new <short_name>` and write the SQL in the file it creates.
-2. Commit it. After it merges to `main`, one person runs `npx supabase db push --remote` from `backend/`.
-3. Do not edit tables, policies or buckets by hand in the dashboard.
-
-Optional local database, with Docker installed: from `backend/`, run `npx supabase start`, copy the URL and keys it prints into your `.env`, and run `npx supabase stop` when you are done.
-
-## Swap Supabase projects or backends
-
-To use a new Supabase project:
-
-1. Replace the three `SUPABASE` values in `.env`.
-2. From `backend/`, run `npx supabase link --project-ref NEW_REF`, then `npx supabase db push --remote`.
-3. From the repo root run `scripts/push-env fly https://YOUR-PROJECT.vercel.app`, then `scripts/push-env vercel https://YOUR-API-NAME.fly.dev`, then `cd frontend && vercel --prod`.
-
-To use a different backend:
-
-1. Set `NEXT_PUBLIC_API_URL` in `.env` for local work.
-2. Run `scripts/push-env vercel https://NEW-BACKEND-URL`, then `cd frontend && vercel --prod`.
-3. Add the web URL to the new backend's allowed origins.
-
-## Troubleshooting
-
-CORS errors in the browser console:
-
-1. Check that `CORS_ORIGINS` holds the exact page origin, including `https://` or the port.
-2. For the deployed app run `scripts/push-env fly https://YOUR-PROJECT.vercel.app` again.
-3. Locally, edit `.env` and restart `./scripts/dev.sh`.
-
-Redirect loops, or being sent back to `/login`:
-
-1. Make sure email confirmation is off. With it on, sign-up creates no session.
-2. Clear cookies for the site and sign in again.
-3. Check that the Supabase URL and publishable key in `.env` come from the same project.
-4. On Vercel, redeploy after changing a variable. Values are fixed at build time.
-
-401 from the API:
-
-1. `Missing bearer token`: sign out and back in.
-2. `Invalid or expired token`: the API's Supabase URL and publishable key must match the project that issued the token. Check the Fly names with `fly secrets list -c backend/fly.toml`.
-3. "Could not reach the API" on the dashboard: `NEXT_PUBLIC_API_URL` must use the same port as `API_PORT`.
-
-Other:
-
-1. `/ai/chat` returns 503: set `ANTHROPIC_API_KEY` and `LLM_MODEL`, and push them to Fly.
-2. `/ai/chat` returns 429: the daily limit of 20 is used up. It is `DAILY_LIMIT` in `backend/app/routers/ai.py`.
-3. Notes do not appear live: confirm `notes` is listed under Database, Publications, `supabase_realtime`, and that both tabs are signed in as the same user.
-
-## Cost notes
-
-1. Supabase pauses free projects after a period of inactivity. If the app stops working after a quiet week, open the dashboard and restore the project.
-2. Vercel Hobby is for non-commercial use.
-3. Fly needs a card on file. This setup uses one shared-cpu-1x machine with 256MB that stops when idle.
-4. The LLM provider bills per token. `LLM_MAX_TOKENS` and the daily limit cap the spend per user.
-
-## Tools we skipped
-
-- Coolify: a self-hosted deploy platform. Vercel and Fly already cover that, and it needs a server you maintain.
-- n8n: workflow automation. A FastAPI router does the same job in code.
-- PocketBase: a backend with its own database and auth, which overlaps with Supabase.
-- Appwrite: a backend with auth, database and storage, which overlaps with Supabase.
+See `docs/architecture.md` for the approved proposal, `docs/decisions.md` for implementation choices, and `docs/verification.md` for the checks and remaining environment limits.
