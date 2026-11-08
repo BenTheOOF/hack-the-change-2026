@@ -18,6 +18,7 @@ import {
   trainingStatusLabel,
   type ExerciseSubmission,
 } from "./custom-exercise-form";
+import { AdminConsole, type Account, type Assignment } from "./admin-console";
 import { ExerciseSteps } from "./exercise-steps";
 import { TrimmedVideo } from "./trimmed-video";
 import { LiveSession } from "./live-session";
@@ -83,7 +84,20 @@ const demoPlans: Prescription[] = [
 // viewer clears it. Clips live in the on-device clip store, keyed by rep id.
 // ponytail: localStorage caps at a few MB; a long demo may stop saving new reps.
 const DEMO_KEY = "physiotrace-demo-v1";
+// Demo admin console: sample accounts kept in the saved demo state.
+const demoAccounts: Account[] = [
+  { id: "demo-admin", email: "you@example.com", display_name: "Demo Admin", role: "therapist", is_admin: true, provider: "google", created_at: "2026-11-01T09:00:00Z" },
+  { id: "demo-therapist", email: "taylor@example.com", display_name: "Taylor Chen", role: "therapist", is_admin: false, provider: "email", created_at: "2026-11-02T09:00:00Z" },
+  { id: "demo-patient", email: "alex@example.com", display_name: "Alex Morgan", role: "patient", is_admin: false, provider: "email", created_at: "2026-11-03T09:00:00Z" },
+  { id: "demo-sam", email: "sam@example.com", display_name: "Sam Rivera", role: "patient", is_admin: false, provider: "google", created_at: "2026-11-04T09:00:00Z" },
+  { id: "demo-jordan", email: "jordan@example.com", display_name: "Jordan Lee", role: "patient", is_admin: false, provider: "email", created_at: "2026-11-05T09:00:00Z" },
+];
+const demoAssignments: Assignment[] = [
+  { therapist_id: "demo-therapist", patient_id: "demo-patient" },
+];
 type DemoState = {
+  accounts?: Account[];
+  assignments?: Assignment[];
   customs?: CustomExercise[];
   // Demo prescriptions of custom exercises, shown in the patient's plan.
   extraPlans?: Prescription[];
@@ -136,6 +150,14 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     ? reps.filter((r) => r.label === "inconclusive")
     : (overview?.queue ?? []);
   const [customs, setCustoms] = useState<CustomExercise[]>([]);
+  // Admin console. viewRole is the experience an admin chose (null: their own role).
+  const [adminPage, setAdminPage] = useState(false);
+  const viewRole = useRef<Profile["role"] | null>(null);
+  const adminOpened = useRef(false);
+  const [accounts, setAccounts] = useState<Account[]>(demo ? demoAccounts : []);
+  const [assignments, setAssignments] = useState<Assignment[]>(
+    demo ? demoAssignments : [],
+  );
   const [extraPlans, setExtraPlans] = useState<Prescription[]>([]);
   const therapistPatients = demo
     ? [{ patient_id: demoPatient.id, care_profiles: demoPatient }]
@@ -177,9 +199,18 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     setLoading(true);
     setError("");
     try {
-      const data: Overview = await request("/overview?day=" + localDay());
+      const view = viewRole.current;
+      const data: Overview = await request(
+        "/overview?day=" + localDay() + (view ? "&view=" + view : ""),
+      );
       setOverview(data);
-      setRole(data.profile.role);
+      setRole(view ?? data.profile.role);
+      // Admins land on the console the first time the page opens.
+      if (data.profile.is_admin && !adminOpened.current) {
+        adminOpened.current = true;
+        setAdminPage(true);
+        void loadAccounts();
+      }
       setReps(data.reps ?? []);
       setReviews(data.feedback ?? []);
       setCustoms(data.custom_exercises ?? []);
@@ -195,6 +226,31 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       setLoading(false);
     }
   }, [demo, request]);
+
+  const adminRequest = useCallback(
+    async (path: string, method = "GET", body?: object) =>
+      apiFetch("/admin" + path, token.current, {
+        method,
+        ...(body
+          ? {
+              body: JSON.stringify(body),
+              headers: { "Content-Type": "application/json" },
+            }
+          : {}),
+      }),
+    [],
+  );
+  async function loadAccounts() {
+    if (demo) return;
+    try {
+      const data: { accounts: Account[]; assignments: Assignment[] } =
+        await adminRequest("/accounts");
+      setAccounts(data.accounts);
+      setAssignments(data.assignments);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Accounts could not be loaded.");
+    }
+  }
 
   useEffect(() => {
     if (demo) return;
@@ -240,6 +296,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     setReviews(restored.reviews ?? []);
     setConsent(restored.consent);
     setCustoms(restored.customs ?? []);
+    if (restored.accounts) setAccounts(restored.accounts);
+    if (restored.assignments) setAssignments(restored.assignments);
     setExtraPlans(restored.extraPlans ?? []);
     void (async () => {
       const urls: Record<string, string> = {};
@@ -280,13 +338,15 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       consent,
       customs,
       extraPlans,
+      accounts,
+      assignments,
     };
     try {
       localStorage.setItem(DEMO_KEY, JSON.stringify(state));
     } catch {
       /* Quota reached or storage blocked: keep the demo in memory. */
     }
-  }, [demo, demoReady, reps, reviews, consent, customs, extraPlans]);
+  }, [demo, demoReady, reps, reviews, consent, customs, extraPlans, accounts, assignments]);
 
   async function clearDemo() {
     if (
@@ -307,6 +367,9 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     Object.values(demoVideoUrls).forEach((url) => URL.revokeObjectURL(url));
     setCustoms([]);
     setExtraPlans([]);
+    setAccounts(demoAccounts);
+    setAssignments(demoAssignments);
+    setAdminPage(false);
     setDemoVideoUrls({});
     reps.forEach((r) => r.local_clip_url && URL.revokeObjectURL(r.local_clip_url));
     const fresh = { review_consent: false, training_consent: false };
@@ -405,6 +468,94 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     return ok;
   }
 
+  // Admin actions resolve to a confirmation sentence, or null when they failed.
+  async function adminAction(apply: () => Promise<void>, message: string) {
+    let ok = false;
+    await guarded(async () => {
+      await apply();
+      ok = true;
+    });
+    return ok ? message : null;
+  }
+  const isTherapistLike = (a: Account) => a.role === "therapist" || a.is_admin;
+  function setAccountRole(account: Account, nextRole: Account["role"]) {
+    return adminAction(async () => {
+      if (demo)
+        setAccounts((list) =>
+          list.map((a) => (a.id === account.id ? { ...a, role: nextRole } : a)),
+        );
+      else {
+        await adminRequest("/accounts/" + account.id + "/role", "POST", { role: nextRole });
+        await loadAccounts();
+      }
+    }, `${account.display_name} is now a ${nextRole}.`);
+  }
+  function setAccountAdmin(account: Account, value: boolean) {
+    const self = account.id === (demo ? "demo-admin" : profile?.id);
+    return adminAction(async () => {
+      if (demo) {
+        if (!value && accounts.filter((a) => a.is_admin).length <= 1)
+          throw new Error("Keep at least one admin");
+        setAccounts((list) =>
+          list.map((a) => (a.id === account.id ? { ...a, is_admin: value } : a)),
+        );
+        if (self && !value) setAdminPage(false);
+      } else {
+        await adminRequest("/accounts/" + account.id + "/admin", "POST", { is_admin: value });
+        if (self && !value) {
+          setAdminPage(false);
+          viewRole.current = null;
+          await load();
+        } else await loadAccounts();
+      }
+    }, value ? `${account.display_name} is now an admin.` : `${account.display_name} is no longer an admin.`);
+  }
+  function assignPatient(therapist: Account, patient: Account) {
+    return adminAction(async () => {
+      if (demo) {
+        if (!isTherapistLike(therapist)) throw new Error("Make this account a therapist first");
+        setAssignments((list) =>
+          list.some((a) => a.therapist_id === therapist.id && a.patient_id === patient.id)
+            ? list
+            : [...list, { therapist_id: therapist.id, patient_id: patient.id }],
+        );
+      } else {
+        await adminRequest("/assignments", "POST", {
+          therapist_id: therapist.id,
+          patient_id: patient.id,
+        });
+        await loadAccounts();
+      }
+    }, `${patient.display_name} is now cared for by ${therapist.display_name}.`);
+  }
+  function unassignPatient(therapist: Account, patient: Account) {
+    return adminAction(async () => {
+      if (demo)
+        setAssignments((list) =>
+          list.filter((a) => !(a.therapist_id === therapist.id && a.patient_id === patient.id)),
+        );
+      else {
+        await adminRequest(`/assignments/${therapist.id}/${patient.id}`, "DELETE");
+        await loadAccounts();
+      }
+    }, `${patient.display_name} is no longer assigned to ${therapist.display_name}.`);
+  }
+  // Admin tabs: the console, or the admin's own therapist or patient experience.
+  function switchView(next: "admin" | Profile["role"]) {
+    setSelected(null);
+    setPage("today");
+    setError("");
+    if (next === "admin") {
+      setAdminPage(true);
+      void loadAccounts();
+      return;
+    }
+    setAdminPage(false);
+    viewRole.current = next;
+    setRole(next);
+    void load();
+  }
+
   async function guarded(action: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -421,6 +572,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     }
   }
   function switchDemo(next: Profile["role"]) {
+    setAdminPage(false);
     setRole(next);
     setSelected(null);
     setPage("today");
@@ -638,9 +790,19 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           </span>
         </Link>
         <span className="nav-label">
-          {role === "patient" ? "YOUR RECOVERY" : "YOUR PRACTICE"}
+          {adminPage
+            ? "ADMINISTRATION"
+            : role === "patient"
+              ? "YOUR RECOVERY"
+              : "YOUR PRACTICE"}
         </span>
         <nav aria-label="Main navigation">
+          {adminPage ? (
+            <button className="nav-item selected">
+              <span>⚙</span>Accounts &amp; roles
+            </button>
+          ) : (
+            <>
           <button
             className={"nav-item " + (page === "today" ? "selected" : "")}
             onClick={() => void openPage("today")}
@@ -689,6 +851,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               </button>
             </>
           )}
+            </>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <div className="privacy-card">
@@ -713,16 +877,25 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           </div>
           <div className="user-card">
             <span className="avatar">
-              {profile?.display_name
-                .split(" ")
+              {(demo && adminPage ? "Demo Admin" : profile?.display_name)
+                ?.split(" ")
                 .map((w) => w[0])
                 .slice(0, 2)
                 .join("") || "PT"}
             </span>
             <div>
-              <strong>{profile?.display_name || "Your account"}</strong>
+              <strong>
+                {demo && adminPage
+                  ? "Demo Admin"
+                  : profile?.display_name || "Your account"}
+              </strong>
               <small>
-                {role === "patient" ? "Patient" : "Physical therapist"}
+                {demo && adminPage
+                  ? "Admin"
+                  : role === "patient"
+                    ? "Patient"
+                    : "Physical therapist"}
+                {!demo && profile?.is_admin ? " · Admin" : ""}
                 {demo ? " · Demo" : ""}
               </small>
             </div>
@@ -740,14 +913,16 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
         <header className="topbar">
           <div>
             <span className="breadcrumb">Your care / </span>
-            {session
+            {adminPage
+              ? "Admin console"
+              : session
               ? "Live session"
               : role === "therapist"
                 ? "Therapist workspace"
                 : "Overview"}
           </div>
           <div className="topbar-right">
-            {role === "patient" && (
+            {role === "patient" && !adminPage && (
               <button
                 className="topbar-privacy"
                 onClick={() => {
@@ -764,20 +939,48 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 <div className="role-switch" aria-label="Demo role">
                   <button
                     disabled={!!session}
-                    className={role === "patient" ? "active" : ""}
+                    className={!adminPage && role === "patient" ? "active" : ""}
                     onClick={() => switchDemo("patient")}
                   >
                     Patient
                   </button>
                   <button
                     disabled={!!session}
-                    className={role === "therapist" ? "active" : ""}
+                    className={!adminPage && role === "therapist" ? "active" : ""}
                     onClick={() => switchDemo("therapist")}
                   >
                     Therapist
                   </button>
+                  <button
+                    disabled={!!session}
+                    className={adminPage ? "active" : ""}
+                    onClick={() => {
+                      setSelected(null);
+                      setAdminPage(true);
+                    }}
+                  >
+                    Admin
+                  </button>
                 </div>
               </>
+            )}
+            {!demo && profile?.is_admin && (
+              <div className="role-switch" aria-label="Admin view">
+                {(["admin", "therapist", "patient"] as const).map((v) => (
+                  <button
+                    key={v}
+                    disabled={!!session || loading}
+                    className={
+                      (v === "admin" ? adminPage : !adminPage && role === v)
+                        ? "active"
+                        : ""
+                    }
+                    onClick={() => switchView(v)}
+                  >
+                    {v === "admin" ? "Admin" : v === "therapist" ? "Therapist" : "Patient"}
+                  </button>
+                ))}
+              </div>
             )}
             <span className="date-label">
               {new Date().toLocaleDateString([], {
@@ -831,7 +1034,20 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               </button>
             </div>
           )}
-          {loading && !profile ? (
+          {adminPage ? (
+            <AdminConsole
+              accounts={accounts}
+              assignments={assignments}
+              selfId={demo ? "demo-admin" : (profile?.id ?? "")}
+              busy={busy}
+              demo={demo}
+              onSetRole={setAccountRole}
+              onSetAdmin={setAccountAdmin}
+              onAssign={assignPatient}
+              onUnassign={unassignPatient}
+              onRefresh={() => void loadAccounts()}
+            />
+          ) : loading && !profile ? (
             <div className="empty-state">
               <h2>Opening your care plan…</h2>
             </div>
