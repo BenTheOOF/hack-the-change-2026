@@ -21,3 +21,11 @@ Review is one transaction with a row lock and a unique rep label. A correct labe
 Use uv-managed Python 3.12.16 and a committed lockfile. CUDA 12.8 PyTorch and NumPy live in the optional `ml` group. The API does not import either package. Dataset version and membership tables support an explicit future offline export; labeling a rep does not create a dataset or start training.
 
 The initial rule ranges are prototype defaults for the two MVP movements, not validated clinical assessments. Confidence thresholds can be prescribed; the fixed range checks need therapist validation before clinical use. No public rehabilitation dataset or raw exercise footage was downloaded.
+
+## 2026-11-07: CUDA or MLX for offline ML
+
+The offline `ml` group installs one accelerator stack per platform: CUDA 12.8 PyTorch on Windows and Linux, and MLX on Apple Silicon macOS. PyTorch is no longer installed on macOS, because CPU or MPS torch is not a target. `backend/check_accelerator.py` picks CUDA first, then MLX, and exits non-zero when neither is usable, so a CPU-only environment is reported instead of silently used. Future training code should import `pick_accelerator()` from that module rather than probing devices itself. The API still imports neither package.
+
+## 2026-11-07: frontend legibility and rep result feedback
+
+Patients may read the screen from a distance during exercise, so the minimum text size was raised (most labels went from 8 to 10 px and 10 px text went to 12 px) and the font stack now starts with the platform UI font. The live session shows the latest rep result in a tinted banner, and an incorrect or uncertain rep scrolls its replay into view, matching the "pause and replay the last rep" routing rule. The session side panel shows today's accepted reps against the prescribed target. Arrows that looked like links on non-interactive cards were removed.

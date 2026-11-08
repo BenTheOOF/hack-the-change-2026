@@ -5,8 +5,14 @@ export function Landing() {
     <div className="landing">
       <header>
         <Link className="brand" href="/">
-          <span className="brand-mark">⌁</span>physio
-          <span className="brand-light">trace</span>
+          <span className="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <path d="M3 17h6l4-10 6 19 4-12h6" />
+            </svg>
+          </span>
+          <span>
+            physio<span className="brand-light">trace</span>
+          </span>
         </Link>
         <div>
           <Link href="/login">Sign in</Link>

@@ -15,7 +15,7 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 - Backend: Python, FastAPI
 - Database: PostgreSQL
 - Clip storage: existing private Supabase Storage (approved implementation choice)
-- ML: Python (PyTorch / scikit-learn), offline training only
+- ML: Python, offline training only. Accelerator is CUDA PyTorch (Windows/Linux) or MLX (Apple Silicon), never CPU-only torch
 
 ## Repo layout
 <!-- Update as the project grows -->
@@ -28,6 +28,7 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 <!-- Fill in once set up -->
 - Frontend dev: `cd frontend && npm run dev`, or `scripts/frontend.ps1` on Windows
 - Backend dev: `cd backend && uv run uvicorn app.main:app --reload`, or `scripts/backend.ps1` on Windows
+- ML accelerator check: `cd backend && uv sync --group ml && uv run --group ml python check_accelerator.py`
 - Tests: `cd frontend && npm test && npm run typecheck`; `cd backend && uv run pytest`
 - Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup`
 
@@ -90,4 +91,6 @@ without changes elsewhere.
 - Phase 1: care schema, RLS, and protected API implemented.
 - Phase 2: browser pose session, baseline classifier, history, and daily targets implemented.
 - Phase 3: assigned therapist queue, prescriptions, review corrections, and feedback implemented.
-- Training: intentionally not run. CUDA PyTorch is available in the optional uv ML group.
+- Phase 4 (2026-11-07): offline ML accelerator is CUDA PyTorch (Windows/Linux) or MLX (Apple Silicon) via the optional uv `ml` group; `backend/check_accelerator.py` verifies it with no CPU fallback. MLX verified on an Apple GPU.
+- Phase 4 frontend polish: larger minimum type and system font stack, live-session result banner (counted / adjust / sent for review), incorrect-rep replay scrolls into view, daily target progress inside the session, flag reason shown to the therapist, decorative arrows removed.
+- Training: intentionally not run.

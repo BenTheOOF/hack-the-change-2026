@@ -4,7 +4,7 @@ Read this before changing anything. Rules for changes are in `.coding-standards`
 
 ## What this repo is
 
-PhysioTrace is now implemented on this starter. Patient and therapist workflows live in frontend/src/features/physio, protected care routes in backend/app/routers/physio.py, and the deterministic baseline in backend/app/physio.py. The approved proposal and implementation decisions are in docs/architecture.md and docs/decisions.md. Training is disabled. CUDA PyTorch is an optional uv dependency group. The remaining sections describe the starter infrastructure retained by the implementation.
+PhysioTrace is now implemented on this starter. Patient and therapist workflows live in frontend/src/features/physio, protected care routes in backend/app/routers/physio.py, and the deterministic baseline in backend/app/physio.py. The approved proposal and implementation decisions are in docs/architecture.md and docs/decisions.md. Training is disabled. The optional uv `ml` group installs CUDA PyTorch on Windows and Linux and MLX on Apple Silicon; `backend/check_accelerator.py` checks it. The remaining sections describe the starter infrastructure retained by the implementation.
 
 A starter for a four-person hackathon team. Sign-in, a database, file storage, realtime and an LLM endpoint are wired up. Teams replace the example pages with their own idea.
 

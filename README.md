@@ -4,7 +4,7 @@ Private exercise feedback for physiotherapy patients, with a review loop for the
 
 The implemented MVP includes bodyweight squat and standing shoulder abduction, browser pose tracking and skeleton overlay, complete-rep segmentation, a versioned rule classifier, daily targets and history, therapist prescriptions, a review queue, and patient feedback. An uncertain rep counts only after an assigned therapist accepts it.
 
-No training has been run. PyTorch is installed for CUDA as an optional offline dependency. The app uses a rule baseline, not a trained exercise classifier.
+No training has been run. The optional offline ML group uses CUDA PyTorch on Windows and Linux and MLX on Apple Silicon. The app uses a rule baseline, not a trained exercise classifier.
 
 ## Run the implementation on this Windows workspace
 
@@ -24,6 +24,17 @@ Open [the interactive demo](http://127.0.0.1:3000/demo). It uses sample data in 
 
 The backend script creates the single root `.env` from `.env.example` if it is missing. Fill in the Supabase values to use saved care records. The landing page and demo work with blank values. Camera use requires HTTPS or localhost and explicit browser permission.
 
+## Run on macOS or Linux
+
+```bash
+cp -n .env.example .env
+cd backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+cd frontend && npm ci && npm run pose:setup && npm run dev
+```
+
 ## Set up a fresh checkout
 
 Install Node.js 24 LTS and uv. Keep exactly one `.env` at the repository root.
@@ -40,15 +51,22 @@ npm run pose:setup
 
 The pose setup copies the installed MediaPipe WASM runtime and downloads the pinned pretrained pose detector from Google. It does not download training data or train a model. Run it again after changing the MediaPipe package version.
 
-For the requested CUDA environment:
+For the offline ML accelerator (CUDA or MLX):
 
-```powershell
+```bash
 cd backend
 uv sync --group ml
-uv run --group ml python check_cuda.py
+uv run --group ml python check_accelerator.py
 ```
 
-`backend/.python-version` pins uv-managed Python 3.12.16. `backend/uv.lock` locks the dependencies. On Windows and Linux, torch comes from the explicit CUDA 12.8 index. The optional `ml` group includes PyTorch and NumPy; the API and production image do not need it. A compatible, accessible NVIDIA GPU and driver are needed for a GPU smoke check. Installing the wheel does not install or change a GPU driver.
+`backend/.python-version` pins uv-managed Python 3.12.16. `backend/uv.lock` locks the dependencies. The optional `ml` group installs NumPy plus one accelerator stack per platform:
+
+| Platform | Stack | Device |
+| --- | --- | --- |
+| Windows, Linux | PyTorch from the explicit CUDA 12.8 index | `cuda` |
+| macOS on Apple Silicon | MLX | Apple GPU through Metal |
+
+`check_accelerator.py` picks CUDA first, then MLX, and exits non-zero when neither is usable. There is no CPU fallback. The API and production image do not need the `ml` group. A CUDA check needs an accessible NVIDIA GPU and driver; installing the wheel does not install or change a driver. Intel Macs have no supported accelerator.
 
 ## Connect Supabase
 
@@ -79,7 +97,7 @@ cd ..\backend
 uv run pytest
 ```
 
-`uv run pytest` syncs only the default groups. Use `uv run --group ml pytest` to preserve an installed CUDA environment. The seven backend tests cover routing, authentication, role checks, replay-safe submission, review validation, and secret-header handling. Three Node tests cover both exercise state machines and confidence routing.
+`uv run pytest` syncs only the default groups. Use `uv run --group ml pytest` to preserve an installed CUDA or MLX environment. The seven backend tests cover routing, authentication, role checks, replay-safe submission, review validation, and secret-header handling. Three Node tests cover both exercise state machines and confidence routing.
 
 For the disposable PostgreSQL checks, install a local verification runtime without changing app dependencies:
 

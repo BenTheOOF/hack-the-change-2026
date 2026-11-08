@@ -14,6 +14,6 @@ if (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'backend\.venv'))) {
     & $taskUv --directory (Join-Path $taskRoot 'backend') sync
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-# Preserve an already installed optional CUDA group while serving the lightweight API.
+# Preserve an already installed optional ML group while serving the lightweight API.
 & $taskUv --directory (Join-Path $taskRoot 'backend') run --no-sync uvicorn app.main:app --host 127.0.0.1 --port $Port
 exit $LASTEXITCODE

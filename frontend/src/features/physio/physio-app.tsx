@@ -379,7 +379,6 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           >
             <span>◫</span>
             {role === "patient" ? "Today’s plan" : "Review queue"}
-            <span className="nav-arrow">↗</span>
           </button>
           {role === "patient" && (
             <>
@@ -539,6 +538,13 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               plan={session.plan}
               demo={demo}
               uploadConsent={consent.review_consent}
+              todayCount={
+                todayReps.filter(
+                  (r) =>
+                    r.prescription_id === session.plan.id &&
+                    r.label === "correct",
+                ).length
+              }
               onRep={record}
               onClose={endSession}
             />
@@ -645,6 +651,13 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                         </span>
                       </div>
                       <PoseReplay frames={pose} videoUrl={clip} />
+                      <p className="review-reason">
+                        <strong>Why it was flagged:</strong> {selected.feedback}{" "}
+                        <span className="muted">
+                          {Math.round(selected.confidence * 100)}% confidence ·{" "}
+                          {selected.model_version} · {selected.exercise_day}
+                        </span>
+                      </p>
                       <p className="muted">
                         Recorded keypoints are available even when the patient
                         has not shared video.
@@ -904,7 +917,6 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   <div className="panel feedback-preview">
                     <div className="section-heading">
                       <h3>From your therapist</h3>
-                      <span>↗</span>
                     </div>
                     {reviews.length ? (
                       <>
@@ -1020,7 +1032,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
         <footer className="app-footer">
           <span>PHYSIOTRACE</span>
           <span>Made for the way you recover.</span>
-          <span>Private by default ↗</span>
+          <span>Private by default</span>
         </footer>
       </div>
       {consentOpen && (
@@ -1134,10 +1146,7 @@ function Stat({
 }) {
   return (
     <div className={"stat-card " + color}>
-      <span className="stat-label">
-        {label}
-        <span>↗</span>
-      </span>
+      <span className="stat-label">{label}</span>
       <div className="stat-value">
         {value}
         <span>{suffix}</span>

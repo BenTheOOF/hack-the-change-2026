@@ -8,7 +8,7 @@ Implement the patient exercise session, daily targets and history, therapist rev
 
 Keep Next.js App Router and TypeScript in `frontend`, FastAPI in `backend`, and Supabase for email/password authentication, PostgreSQL, and private review-clip storage. Supabase storage fills the object-storage role in AGENTS.md without introducing a second storage service or MinIO. Keep existing auth and API entry points. Add routes through the router discovery already present in `app/main.py`.
 
-Use MediaPipe Pose Landmarker in the browser for body keypoints. Its pretrained pose detector is inference infrastructure, not a trained exercise classifier. Add its web SDK because implementing pose estimation with platform APIs alone is not practical. Use uv to pin Python 3.12, manage the virtual environment, and lock dependencies. Put CUDA-enabled PyTorch in an optional `ml` dependency group so the API deployment does not load or install the GPU stack by default.
+Use MediaPipe Pose Landmarker in the browser for body keypoints. Its pretrained pose detector is inference infrastructure, not a trained exercise classifier. Add its web SDK because implementing pose estimation with platform APIs alone is not practical. Use uv to pin Python 3.12, manage the virtual environment, and lock dependencies. Put the accelerator stack (CUDA PyTorch on Windows and Linux, MLX on Apple Silicon) in an optional `ml` dependency group so the API deployment does not load or install the GPU stack by default.
 
 ## Patient session
 
@@ -41,6 +41,6 @@ Keep route pages thin and place application code under `frontend/src/features/ph
 
 ## Verification and delivery
 
-Use the existing pytest setup for API authorization, input limits, replay-safe rep submission, and review routing. Use Node's built-in test runner for segmentation and classifier logic rather than adding another test framework. Run frontend typecheck and build, backend tests, and a CUDA tensor smoke check without training. Document migrations, administrator setup for therapist assignments, local startup, consent behavior, and remaining live-account checks.
+Use the existing pytest setup for API authorization, input limits, replay-safe rep submission, and review routing. Use Node's built-in test runner for segmentation and classifier logic rather than adding another test framework. Run frontend typecheck and build, backend tests, and a CUDA or MLX tensor smoke check without training. Document migrations, administrator setup for therapist assignments, local startup, consent behavior, and remaining live-account checks.
 
 Implement in runnable phases: data/API foundation, patient session, therapist review/feedback, and final verification. Update the README and `docs/decisions.md` as each phase lands. Do not deploy or apply remote database migrations as part of local implementation.

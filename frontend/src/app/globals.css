@@ -15,7 +15,13 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -162,7 +168,7 @@ legend {
   font-weight: 600;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.7px;
   font-weight: 650;
   color: #7b8779;
@@ -212,7 +218,7 @@ legend {
   font-weight: 350;
 }
 .brand small {
-  font-size: 6.8px;
+  font-size: 8px;
   letter-spacing: 1.2px;
   font-weight: 600;
   margin-top: 4px;
@@ -236,7 +242,7 @@ legend {
   stroke-linecap: round;
 }
 .nav-label {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1.5px;
   color: #969e92;
   margin: 55px 12px 14px;
@@ -262,13 +268,10 @@ legend {
   color: var(--green);
   font-weight: 600;
 }
-.nav-arrow {
-  margin-left: auto;
-}
 .nav-number {
   margin-left: auto;
   background: #dde8d5;
-  font-size: 10px;
+  font-size: 12px;
   padding: 0 5px;
   border-radius: 4px;
 }
@@ -295,13 +298,13 @@ legend {
   font-weight: 550;
 }
 .privacy-card p {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.7;
   margin: 7px 0 10px;
 }
 .privacy-card button {
   padding: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--green);
 }
@@ -317,17 +320,17 @@ legend {
   height: 35px;
   border-radius: 50%;
   background: #ecdfd0;
-  font-size: 11px;
+  font-size: 12.5px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .user-card strong {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .user-card small {
-  font-size: 10px;
+  font-size: 12px;
 }
 .user-card form {
   margin-left: auto;
@@ -345,7 +348,7 @@ legend {
   align-items: center;
   border-bottom: 1px solid var(--line);
   padding: 0 42px;
-  font-size: 11px;
+  font-size: 12.5px;
   background: var(--paper);
   gap: 20px;
 }
@@ -359,13 +362,13 @@ legend {
   gap: 20px;
 }
 .date-label {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--muted);
   border-left: 1px solid var(--line);
   padding-left: 20px;
 }
 .demo-badge {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 1px;
   color: #82694c;
 }
@@ -377,7 +380,7 @@ legend {
   gap: 3px;
 }
 .role-switch button {
-  font-size: 10px;
+  font-size: 12px;
   padding: 5px 10px;
   border-radius: 4px;
   color: #778170;
@@ -395,7 +398,7 @@ legend {
   flex: 1;
 }
 .demo-strip {
-  font-size: 10px;
+  font-size: 12px;
   color: #8a8e80;
   display: flex;
   justify-content: space-between;
@@ -420,7 +423,7 @@ legend {
 .care-pill {
   border: 1px solid var(--line);
   border-radius: 30px;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
   padding: 8px 12px;
   color: #77866d;
@@ -460,7 +463,7 @@ legend {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12.5px;
   color: #64725f;
   gap: 8px;
 }
@@ -481,7 +484,7 @@ legend {
   margin-left: 9px;
 }
 .stat-detail {
-  font-size: 10px;
+  font-size: 12px;
   color: #7e8977;
 }
 .section-heading {
@@ -496,7 +499,7 @@ legend {
   margin-bottom: 0;
 }
 .section-heading > .muted {
-  font-size: 10px;
+  font-size: 12px;
 }
 .patient-grid {
   display: grid;
@@ -535,7 +538,7 @@ legend {
   position: absolute;
   top: 15px;
   left: 16px;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   color: #8d9c81;
 }
@@ -545,7 +548,7 @@ legend {
   min-width: 0;
 }
 .exercise-content > .eyebrow {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 1px;
   margin-bottom: 8px;
 }
@@ -554,7 +557,7 @@ legend {
   margin-bottom: 7px;
 }
 .exercise-content p {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.65;
   margin-bottom: 18px;
   max-width: 390px;
@@ -566,12 +569,12 @@ legend {
   margin-bottom: 8px;
 }
 .exercise-progress > span:last-child {
-  font-size: 9px;
+  font-size: 11px;
   color: #939c8b;
   padding-top: 3px;
 }
 .exercise-progress .muted {
-  font-size: 10px;
+  font-size: 12px;
 }
 .progress-track {
   height: 4px;
@@ -591,7 +594,7 @@ legend {
   width: 100%;
   min-height: 37px;
   padding: 9px 14px;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .panel {
   background: white;
@@ -607,7 +610,7 @@ legend {
   overflow: hidden;
 }
 .note-panel > .eyebrow {
-  font-size: 8px;
+  font-size: 10px;
 }
 .note-flower {
   display: block;
@@ -624,11 +627,11 @@ legend {
   letter-spacing: -0.4px;
 }
 .note-panel p {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.9;
 }
 .note-panel .muted {
-  font-size: 9px;
+  font-size: 11px;
 }
 .feedback-preview {
   padding: 24px;
@@ -637,7 +640,7 @@ legend {
   font-size: 14px;
 }
 .feedback-preview p {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.8;
   margin-bottom: 0;
 }
@@ -657,7 +660,7 @@ legend {
 }
 .safety-inline p {
   margin: 0;
-  font-size: 10px;
+  font-size: 12px;
   color: #83907c;
 }
 .safety-inline strong {
@@ -670,12 +673,12 @@ legend {
   margin: 10px 42px 0;
   padding: 22px 0;
   border-top: 1px solid var(--line);
-  font-size: 9px;
+  font-size: 11px;
   color: #8c9587;
   gap: 10px;
 }
 .app-footer > span:first-child {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 1.5px;
 }
 .error,
@@ -727,7 +730,7 @@ legend {
   font-size: 12px;
 }
 .queue-item small {
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 3px;
 }
 .queue-selected {
@@ -748,7 +751,7 @@ legend {
 .queue-time {
   margin-left: auto;
   color: #8e9885;
-  font-size: 9px;
+  font-size: 11px;
   text-align: right;
 }
 .empty-state {
@@ -824,15 +827,15 @@ legend {
   font-size: 13px;
 }
 .rep-row small {
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 3px;
 }
 .rep-row p {
-  font-size: 11px;
+  font-size: 12.5px;
   margin: 5px 0 0;
 }
 .badge {
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
   padding: 5px 9px;
   border-radius: 5px;
@@ -927,7 +930,7 @@ legend {
   background: #243c33aa;
   color: #dfebd7;
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 11px;
   padding: 5px 10px;
   z-index: 2;
 }
@@ -936,7 +939,7 @@ legend {
   bottom: 14px;
   left: 17px;
   color: #bbcab5;
-  font-size: 9px;
+  font-size: 11px;
 }
 .feedback-banner {
   display: flex;
@@ -951,12 +954,39 @@ legend {
   font-weight: 600;
 }
 .feedback-banner p {
-  font-size: 11px;
+  font-size: 12.5px;
   margin: 3px 0 0;
 }
 .feedback-icon {
   color: #a67755;
   font-size: 29px;
+}
+.feedback-banner[class*="tone-"] {
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: background-color 0.3s ease;
+}
+.feedback-banner.tone-correct {
+  background: #e9f0e2;
+  border-color: #d3e1c8;
+}
+.feedback-banner.tone-correct .feedback-icon {
+  color: #507141;
+}
+.feedback-banner.tone-incorrect {
+  background: #f5e8df;
+  border-color: #ecd5c6;
+}
+.feedback-banner.tone-incorrect .feedback-icon {
+  color: #a05e46;
+}
+.feedback-banner.tone-inconclusive {
+  background: #f5eed9;
+  border-color: #eadfbe;
+}
+.feedback-banner.tone-inconclusive .feedback-icon {
+  color: #8d743c;
 }
 .feedback-banner > button {
   margin-left: auto;
@@ -967,13 +997,18 @@ legend {
   line-height: 1.3;
   margin: 20px 0 10px;
 }
+.session-count small {
+  display: inline;
+  font-size: 22px;
+  color: var(--muted);
+}
 .session-count span {
   font-size: 12px;
   display: block;
   color: var(--muted);
 }
 .session-aside p {
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .setup-check {
   font-size: 12px;
@@ -999,14 +1034,14 @@ legend {
 }
 .safety-note {
   padding: 15px;
-  font-size: 11px;
+  font-size: 12.5px;
   max-width: 600px;
 }
 .safety-note strong {
   font-weight: 600;
 }
 .safety-note p {
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .pose-replay {
   position: relative;
@@ -1038,14 +1073,19 @@ legend {
   font-size: 12px;
 }
 .demo-controls > span {
-  font-size: 10px;
+  font-size: 12px;
   width: 100%;
   color: var(--muted);
 }
 .demo-controls button {
-  font-size: 10px;
+  font-size: 12px;
   min-height: 32px;
   padding: 8px 12px;
+}
+.replay-panel .replay-cue {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 14px 0 4px;
 }
 .replay-panel p {
   font-size: 12px;
@@ -1088,7 +1128,7 @@ legend {
   font-weight: 550;
 }
 .consent-choice small {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.7;
   margin-top: 6px;
   font-weight: 400;
@@ -1188,7 +1228,7 @@ legend {
   max-width: 630px;
 }
 .landing-details > span {
-  font-size: 10px;
+  font-size: 12px;
   color: #a48a69;
   flex: 1;
 }
@@ -1200,10 +1240,10 @@ legend {
   margin: 7px 0;
 }
 .landing-details small {
-  font-size: 10px;
+  font-size: 12px;
 }
 .landing main > .safety-note {
-  font-size: 10px;
+  font-size: 12px;
   padding: 10px 0;
   max-width: 550px;
   color: #949d8b;
@@ -1243,7 +1283,7 @@ legend {
   background: #fafbf4;
   padding: 14px 22px;
   box-shadow: 0 6px 30px #465b3110;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 @media (min-width: 1600px) {
   .workspace {
@@ -1275,7 +1315,7 @@ legend {
     font-size: 22px;
   }
   .brand small {
-    font-size: 6px;
+    font-size: 8px;
   }
   .main-shell {
     margin-left: 215px;
@@ -1313,7 +1353,7 @@ legend {
     padding: 18px;
   }
   .stat-label {
-    font-size: 10px;
+    font-size: 12px;
   }
   .session-layout {
     grid-template-columns: minmax(0, 1fr) 225px;
@@ -1325,7 +1365,7 @@ legend {
     align-items: flex-start;
   }
   .session-layout .section-heading .secondary {
-    font-size: 10px;
+    font-size: 12px;
     padding: 9px;
   }
 }
@@ -1340,13 +1380,13 @@ legend {
     font-size: 20px;
   }
   .brand small {
-    font-size: 5.6px;
+    font-size: 8px;
   }
   .brand-mark {
     width: 28px;
   }
   .nav-item {
-    font-size: 11px;
+    font-size: 12.5px;
     gap: 8px;
     padding-left: 8px;
   }
@@ -1386,7 +1426,7 @@ legend {
     grid-template-columns: 1fr;
   }
   .stat-detail {
-    font-size: 9px;
+    font-size: 11px;
   }
   .stat-value {
     font-size: 37px;
@@ -1447,7 +1487,7 @@ legend {
     font-size: 24px;
   }
   .brand small {
-    font-size: 6.8px;
+    font-size: 8px;
   }
   .sidebar-bottom,
   .nav-label {
@@ -1463,10 +1503,9 @@ legend {
     justify-content: center;
     gap: 7px;
     margin: 0;
-    font-size: 10px;
+    font-size: 12px;
     white-space: nowrap;
   }
-  .nav-arrow,
   .nav-number {
     display: none;
   }
@@ -1477,20 +1516,20 @@ legend {
   .topbar {
     height: 56px;
     padding: 0 20px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .topbar-right {
     gap: 10px;
   }
   .role-switch button {
-    font-size: 9px;
+    font-size: 11px;
     padding: 4px 8px;
   }
   .workspace {
     padding: 18px 20px;
   }
   .demo-strip {
-    font-size: 9px;
+    font-size: 11px;
     display: block;
     margin-bottom: 26px;
   }
@@ -1510,10 +1549,10 @@ legend {
     letter-spacing: -1.1px;
   }
   .page-heading p {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   .eyebrow {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 1.2px;
   }
   .stats-grid {
@@ -1525,7 +1564,7 @@ legend {
     border-radius: 8px;
   }
   .stat-label {
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.5;
     min-height: 27px;
   }
@@ -1541,7 +1580,7 @@ legend {
     margin-left: 4px;
   }
   .stat-detail {
-    font-size: 8px;
+    font-size: 10px;
     display: block;
     line-height: 1.6;
     min-height: 26px;
@@ -1550,7 +1589,7 @@ legend {
     font-size: 18px;
   }
   .section-heading .muted {
-    font-size: 9px;
+    font-size: 11px;
   }
   .patient-grid {
     gap: 16px;
@@ -1569,10 +1608,10 @@ legend {
     font-size: 17px;
   }
   .exercise-content p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .exercise-content > .eyebrow {
-    font-size: 7px;
+    font-size: 9px;
     letter-spacing: 0.6px;
   }
   .exercise-progress > span:last-child {
@@ -1603,11 +1642,11 @@ legend {
     margin-top: 23px;
   }
   .safety-inline p {
-    font-size: 9px;
+    font-size: 11px;
   }
   .app-footer {
     margin: 5px 20px 0;
-    font-size: 8px;
+    font-size: 10px;
   }
   .app-footer > span:last-child {
     display: none;
@@ -1625,10 +1664,10 @@ legend {
     font-size: 12px;
   }
   .queue-item small {
-    font-size: 9px;
+    font-size: 11px;
   }
   .queue-time {
-    font-size: 8px;
+    font-size: 10px;
   }
   .session-layout .section-heading {
     gap: 10px;
@@ -1647,7 +1686,7 @@ legend {
     margin: 8px;
   }
   .camera-chip {
-    font-size: 8px;
+    font-size: 10px;
     top: 10px;
     left: 10px;
   }
@@ -1659,11 +1698,11 @@ legend {
     flex: 1;
   }
   .feedback-banner > .primary {
-    font-size: 11px;
+    font-size: 12.5px;
     padding: 10px 15px;
   }
   .feedback-banner p {
-    font-size: 10px;
+    font-size: 12px;
   }
   .session-aside {
     grid-template-columns: 1fr;
@@ -1678,7 +1717,7 @@ legend {
   .setup-check {
     display: inline-flex;
     margin: 8px 12px 4px 0;
-    font-size: 10px;
+    font-size: 12px;
   }
   .session-aside h3 {
     font-size: 17px;
@@ -1703,7 +1742,7 @@ legend {
     font-size: 12px;
   }
   .badge {
-    font-size: 8px;
+    font-size: 10px;
   }
   .consent-modal {
     padding: 26px;
@@ -1727,7 +1766,7 @@ legend {
   }
   .landing header .primary {
     padding: 9px 12px;
-    font-size: 11px;
+    font-size: 12.5px;
     min-height: 37px;
   }
   .landing .brand {
@@ -1763,24 +1802,24 @@ legend {
     margin-top: 55px;
   }
   .landing-details strong {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   .landing-details small {
-    font-size: 9px;
+    font-size: 11px;
   }
   .landing-actions {
     gap: 8px;
   }
   .landing-actions a {
-    font-size: 11px;
+    font-size: 12.5px;
     padding: 12px;
   }
   .landing main > .safety-note {
-    font-size: 9px;
+    font-size: 11px;
   }
 }
 .topbar-privacy {
-  font-size: 10px;
+  font-size: 12px;
   color: #6d8063;
   white-space: nowrap;
 }
@@ -1804,4 +1843,11 @@ legend {
   * {
     scroll-behavior: auto !important;
   }
+}
+.review-reason {
+  margin: 14px 0 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f5eed9;
+  font-size: 12.5px;
 }

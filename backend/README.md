@@ -9,9 +9,9 @@ uv sync
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-On the prepared Windows workspace, `..\scripts\backend.ps1` finds the local uv runtime and preserves the installed optional CUDA group.
+On the prepared Windows workspace, `..\scripts\backend.ps1` finds the local uv runtime and preserves the installed optional ML group.
 
-`uv sync --group ml` installs CUDA 12.8 PyTorch and NumPy for future offline work. `uv run --group ml python check_cuda.py` performs a tensor smoke check. The API never imports torch and no training runs.
+`uv sync --group ml` installs NumPy plus CUDA 12.8 PyTorch on Windows and Linux, or MLX on Apple Silicon, for future offline work. `uv run --group ml python check_accelerator.py` runs a matrix multiply on CUDA or MLX and fails when neither is available. The API never imports torch or MLX and no training runs.
 
 ## Routes
 
@@ -37,4 +37,4 @@ Rep results preserve the server-derived exercise day in the patient's IANA timez
 
 Apply the new timestamped care migration after the starter migrations. It creates care roles and assignments, prescriptions, sessions, reps, reviews, explicit offline dataset manifests, and private clip storage. Existing migrations and `app/main.py` are unchanged. Run `supabase/admin-care.sql` with administrator access to grant a therapist role and patient assignment.
 
-`uv run pytest` runs the existing pytest framework. Use `uv run --group ml pytest` to preserve the optional CUDA group. The disposable PostgreSQL checks are documented in the root README. They do not connect to a live care database.
+`uv run pytest` runs the existing pytest framework. Use `uv run --group ml pytest` to preserve the optional ML group. The disposable PostgreSQL checks are documented in the root README. They do not connect to a live care database.

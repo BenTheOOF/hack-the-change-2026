@@ -19,6 +19,7 @@ type Props = {
   plan: Prescription;
   demo: boolean;
   uploadConsent: boolean;
+  todayCount: number;
   onRep: (
     frames: PoseFrame[],
     evaluation: Evaluation,
@@ -31,6 +32,7 @@ export function LiveSession({
   plan,
   demo,
   uploadConsent,
+  todayCount,
   onRep,
   onClose,
 }: Props) {
@@ -68,6 +70,17 @@ export function LiveSession({
   } | null>(null);
   const lastUrl = useRef<string | null>(null);
   const smallCanvas = useRef<HTMLCanvasElement | null>(null);
+  const replayPanel = useRef<HTMLDivElement>(null);
+  const lastLabel = last?.evaluation.label;
+
+  // A rep that needs attention must be seen, not left below the fold.
+  useEffect(() => {
+    if (lastLabel && lastLabel !== "correct")
+      replayPanel.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+  }, [last, lastLabel]);
 
   const stopRecording = (): Promise<Blob | undefined> => {
     if (!recorder.current || recorder.current.state === "inactive")
@@ -376,7 +389,7 @@ export function LiveSession({
               await onClose();
             }}
           >
-            End session ↗
+            End session
           </button>
         </div>
         <div className="camera-stage">
@@ -414,13 +427,24 @@ export function LiveSession({
           </span>
           <span className="camera-bottom">No audio · Private by default</span>
         </div>
-        <div className="feedback-banner" aria-live="polite">
-          <span className="feedback-icon">✦</span>
+        <div
+          className={"feedback-banner" + (lastLabel ? " tone-" + lastLabel : "")}
+          aria-live="polite"
+        >
+          <span className="feedback-icon" aria-hidden="true">
+            {lastLabel === "correct" ? "✓" : lastLabel === "incorrect" ? "↺" : "✦"}
+          </span>
           <div>
             <strong>
-              {active
-                ? "You’re ready. Move at your pace."
-                : "One repetition at a time."}
+              {lastLabel === "correct"
+                ? "Rep counted. Keep your pace."
+                : lastLabel === "incorrect"
+                  ? "Let’s adjust that one."
+                  : lastLabel === "inconclusive"
+                    ? "Sent to your therapist for a closer look."
+                    : active
+                      ? "You’re ready. Move at your pace."
+                      : "One repetition at a time."}
             </strong>
             <p>{feedback}</p>
           </div>
@@ -466,17 +490,24 @@ export function LiveSession({
           </p>
         )}
         {last && last.evaluation.label !== "correct" && (
-          <div className="panel replay-panel">
+          <div className="panel replay-panel" ref={replayPanel}>
             <div className="section-heading">
               <h3>Your last repetition</h3>
               <span className={"badge " + last.evaluation.label}>
                 {last.evaluation.label === "inconclusive"
                   ? "Awaiting review"
-                  : "Try again"}
+                  : "Not counted"}
               </span>
             </div>
             <PoseReplay frames={last.frames} videoUrl={last.url} />
-            <p>{last.evaluation.feedback}</p>
+            <p className="replay-cue">{last.evaluation.feedback}</p>
+            <p className="muted">
+              {last.evaluation.label === "inconclusive"
+                ? "This rep counts once your therapist accepts it."
+                : "Watch the replay, then try the next rep when you are ready."}{" "}
+              {Math.round(last.evaluation.confidence * 100)}% confidence ·{" "}
+              {last.evaluation.model_version}
+            </p>
           </div>
         )}
         {demo && (
@@ -506,12 +537,30 @@ export function LiveSession({
       </div>
       <aside className="session-aside">
         <div className="panel">
-          <span className="eyebrow">THIS SESSION</span>
+          <span className="eyebrow">TODAY</span>
           <div className="session-count">
-            {accepted}
-            <span>accepted reps</span>
+            {todayCount}
+            <small> / {plan.daily_target}</small>
+            <span>accepted reps today</span>
           </div>
-          <p>{pending} waiting for review</p>
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-label="Daily target"
+            aria-valuemin={0}
+            aria-valuemax={plan.daily_target}
+            aria-valuenow={Math.min(todayCount, plan.daily_target)}
+          >
+            <span
+              style={{
+                width:
+                  Math.min(100, (todayCount / plan.daily_target) * 100) + "%",
+              }}
+            />
+          </div>
+          <p>
+            This session: {accepted} accepted · {pending} waiting for review
+          </p>
           <div className="divider" />
           <h3>Make room to move</h3>
           {[
