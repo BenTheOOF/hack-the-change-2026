@@ -116,7 +116,11 @@ async def overview(ctx: Context, day: date | None = None) -> dict:
         patients = await ctx.call("GET", "/rest/v1/care_assignments?select=patient_id,care_profiles!care_assignments_patient_id_fkey(*)")
         reps = await ctx.call("GET", f"/rest/v1/exercise_reps?label=eq.inconclusive&select={REP_FIELDS}&order=created_at.asc&limit=100")
         customs = await ctx.call("GET", f"/rest/v1/custom_exercises?select={CUSTOM_FIELDS}&order=created_at.desc&limit=100")
-        return {"profile": profile, "patients": patients, "queue": reps, "custom_exercises": customs}
+        # Current and upcoming plans this therapist wrote, for the Patients & plans section.
+        plans = await ctx.call("GET", f"/rest/v1/exercise_prescriptions?therapist_id=eq.{ctx.user['id']}"
+                                      f"&ends_on=gte.{chosen}&select=*&order=created_at.desc&limit=200")
+        return {"profile": profile, "patients": patients, "queue": reps, "custom_exercises": customs,
+                "prescriptions": plans}
     user_id = ctx.user["id"]
     prescriptions = await ctx.call("GET", f"/rest/v1/exercise_prescriptions?patient_id=eq.{user_id}&starts_on=lte.{chosen}&ends_on=gte.{chosen}&select=*")
     reps = await ctx.call("GET", f"/rest/v1/exercise_reps?patient_id=eq.{user_id}&exercise_day=eq.{chosen}&select={REP_FIELDS}&order=created_at.desc&limit=1000")

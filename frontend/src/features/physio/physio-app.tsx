@@ -137,6 +137,14 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     : (overview?.queue ?? []);
   const [customs, setCustoms] = useState<CustomExercise[]>([]);
   const [extraPlans, setExtraPlans] = useState<Prescription[]>([]);
+  const therapistPatients = demo
+    ? [{ patient_id: demoPatient.id, care_profiles: demoPatient }]
+    : (overview?.patients ?? []);
+  const therapistPlans = demo
+    ? [...demoPlans, ...extraPlans]
+    : role === "therapist"
+      ? (overview?.prescriptions ?? [])
+      : [];
   const plans = [
     ...(overview?.prescriptions ?? []),
     ...(demo && role === "patient" ? extraPlans : []),
@@ -639,7 +647,27 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           >
             <span>◫</span>
             {role === "patient" ? "Today’s plan" : "Review queue"}
+            {role === "therapist" && queue.length > 0 && (
+              <span className="nav-number">{queue.length}</span>
+            )}
           </button>
+          {role === "therapist" && (
+            <>
+              <button
+                className={"nav-item " + (page === "plans" ? "selected" : "")}
+                onClick={() => void openPage("plans")}
+              >
+                <span>☰</span>Patients &amp; plans
+              </button>
+              <button
+                className={"nav-item " + (page === "exercises" ? "selected" : "")}
+                onClick={() => void openPage("exercises")}
+              >
+                <span>✚</span>Your exercises
+                {training && <span className="nav-number">…</span>}
+              </button>
+            </>
+          )}
           {role === "patient" && (
             <>
               <button
@@ -827,7 +855,142 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               onClose={endSession}
             />
           ) : role === "therapist" ? (
-            <>
+            page === "plans" ? (
+              <>
+              <div className="page-heading">
+                <div>
+                  <span className="eyebrow">THE RIGHT PLAN FOR EACH PERSON</span>
+                  <h1>Patients &amp; plans.</h1>
+                  <p>See what each patient is working on and prescribe what comes next.</p>
+                </div>
+              </div>
+              <div className="patient-plans">
+                {therapistPatients.length === 0 ? (
+                  <div className="panel">
+                    <Empty
+                      title="No assigned patients yet."
+                      text="An administrator links patients to your account. They appear here once assigned."
+                    />
+                  </div>
+                ) : (
+                  therapistPatients.map((p) => {
+                    const theirs = therapistPlans.filter((plan) => plan.patient_id === p.patient_id);
+                    return (
+                      <article className="panel patient-plan-card" key={p.patient_id}>
+                        <div className="section-heading">
+                          <h2>{p.care_profiles.display_name}</h2>
+                          <span className="muted">
+                            {theirs.length} active plan{theirs.length === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                        {theirs.length ? (
+                          <ul className="plan-list">
+                            {theirs.map((plan) => (
+                              <li key={plan.id}>
+                                <strong>{info(plan).name}</strong>
+                                <span className="muted">
+                                  {plan.daily_target} reps a day · {plan.starts_on} to {plan.ends_on}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted">No active plans. Prescribe one below.</p>
+                        )}
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+              <div className="panel prescription-panel">
+                <h2>Prescribe an exercise</h2>
+                <p className="muted">
+                  Set a daily target for a patient already assigned to you.
+                </p>
+                <PrescriptionForm
+                  customs={customs.filter((c) => c.status === "ready")}
+                  patients={
+                    demo
+                      ? [
+                          {
+                            patient_id: demoPatient.id,
+                            care_profiles: demoPatient,
+                          },
+                        ]
+                      : (overview?.patients ?? [])
+                  }
+                  busy={busy}
+                  onSubmit={async (body) => {
+                    let ok = false;
+                    await guarded(async () => {
+                      if (!demo) await request("/prescriptions", "POST", body);
+                      else if (body.exercise === "custom")
+                        setExtraPlans((current) => [
+                          ...current,
+                          {
+                            ...(body as unknown as Prescription),
+                            id: crypto.randomUUID(),
+                            patient_id: demoPatient.id,
+                            instructions: String(body.instructions ?? ""),
+                          },
+                        ]);
+                      ok = true;
+                    });
+                    if (ok && !demo) void load();
+                    return ok
+                      ? demo && body.exercise !== "custom"
+                        ? "Previewed only: the demo plan already includes this exercise. Sign in to save real plans."
+                        : demo
+                          ? "Switch to Patient to try it."
+                          : "Your patient sees it after refreshing their plan."
+                      : null;
+                  }}
+                />
+              </div>
+              </>
+            ) : page === "exercises" ? (
+              <>
+              <div className="page-heading">
+                <div>
+                  <span className="eyebrow">MOVEMENTS MADE FOR YOUR PATIENTS</span>
+                  <h1>Your exercises.</h1>
+                  <p>Add a movement from a demo video. Once its model is ready, prescribe it like any other exercise.</p>
+                </div>
+              </div>
+              <div className="panel custom-panel">
+                {customs.length > 0 && (
+                  <h2 className="custom-subhead">Saved exercises</h2>
+                )}
+                {customs.length > 0 && (
+                  <ul className="custom-list">
+                    {customs.map((c) => (
+                      <li key={c.id}>
+                        <span className={"badge status-" + c.status}>
+                          {trainingStatusLabel(c.status)}
+                        </span>
+                        <div>
+                          <strong>{c.name}</strong>
+                          <small>
+                            {c.status === "failed"
+                              ? c.status_detail || "The demo could not be used. Record it again."
+                              : c.status === "ready" && c.model
+                                ? `${c.model.demoReps} demo reps · ${c.view === "front" ? "facing camera" : "side-on"} · ${c.model_version}`
+                                : "The trainer will pick this up shortly."}
+                          </small>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <h2 className="custom-subhead">Add an exercise</h2>
+                <p className="muted">
+                  Upload or record a demo, trim it to the reps you want, then save.
+                </p>
+                <CustomExerciseForm busy={busy} demo={demo} onSubmit={submitExercise} />
+              </div>
+              </>
+            ) : (
+              <>
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">
@@ -1014,82 +1177,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   )}
                 </div>
               </div>
-              <div className="panel prescription-panel">
-                <h2>Prescribe an exercise</h2>
-                <p className="muted">
-                  Set a daily target for a patient already assigned to you.
-                </p>
-                <PrescriptionForm
-                  customs={customs.filter((c) => c.status === "ready")}
-                  patients={
-                    demo
-                      ? [
-                          {
-                            patient_id: demoPatient.id,
-                            care_profiles: demoPatient,
-                          },
-                        ]
-                      : (overview?.patients ?? [])
-                  }
-                  busy={busy}
-                  onSubmit={(body) =>
-                    guarded(async () => {
-                      if (!demo) await request("/prescriptions", "POST", body);
-                      else if (body.exercise === "custom")
-                        setExtraPlans((current) => [
-                          ...current,
-                          {
-                            ...(body as unknown as Prescription),
-                            id: crypto.randomUUID(),
-                            patient_id: demoPatient.id,
-                            instructions: String(body.instructions ?? ""),
-                          },
-                        ]);
-                      setNotice(
-                        demo
-                          ? body.exercise === "custom"
-                            ? "Added to " + demoPatient.display_name + "'s plan. Switch to Patient to try it."
-                            : "Demo prescription previewed. Sign in to save a real care plan."
-                          : "The prescription is ready in your patient’s plan.",
-                      );
-                    })
-                  }
-                />
-              </div>
-              <div className="panel custom-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>Your exercises</h2>
-                    <p className="muted">
-                      Add a movement with a demo video. A model is trained from
-                      the demo&apos;s pose, then you can prescribe it.
-                    </p>
-                  </div>
-                </div>
-                {customs.length > 0 && (
-                  <ul className="custom-list">
-                    {customs.map((c) => (
-                      <li key={c.id}>
-                        <span className={"badge status-" + c.status}>
-                          {trainingStatusLabel(c.status)}
-                        </span>
-                        <div>
-                          <strong>{c.name}</strong>
-                          <small>
-                            {c.status === "failed"
-                              ? c.status_detail || "The demo could not be used. Record it again."
-                              : c.status === "ready" && c.model
-                                ? `${c.model.demoReps} demo reps · ${c.view === "front" ? "facing camera" : "side-on"} · ${c.model_version}`
-                                : "The trainer will pick this up shortly."}
-                          </small>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <CustomExerciseForm busy={busy} demo={demo} onSubmit={submitExercise} />
-              </div>
-            </>
+              </>
+            )
           ) : page === "today" ? (
             <>
               <div className="page-heading">
@@ -1813,17 +1902,26 @@ function PrescriptionForm({
   patients: NonNullable<Overview["patients"]>;
   customs: CustomExercise[];
   busy: boolean;
-  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+  // Resolves to a follow-up sentence on success, or null when saving failed.
+  onSubmit: (body: Record<string, unknown>) => Promise<string | null>;
 }) {
+  const [saved, setSaved] = useState("");
   return (
     <form
       className="prescription-form"
-      onSubmit={(event) => {
+      onChange={() => setSaved("")}
+      onSubmit={async (event) => {
         event.preventDefault();
-        const d = new FormData(event.currentTarget);
+        const form = event.currentTarget;
+        const d = new FormData(form);
         const choice = String(d.get("exercise"));
         const custom = choice.startsWith("custom:") ? choice.slice(7) : null;
-        void onSubmit({
+        const select = form.elements.namedItem("exercise") as HTMLSelectElement;
+        const patient = form.elements.namedItem("patient_id") as HTMLSelectElement;
+        const exerciseName = select.selectedOptions[0]?.textContent ?? "The exercise";
+        const patientName = patient.selectedOptions[0]?.textContent ?? "your patient";
+        setSaved("");
+        const next = await onSubmit({
           patient_id: d.get("patient_id"),
           exercise: custom ? "custom" : choice,
           custom_exercise_id: custom,
@@ -1833,6 +1931,10 @@ function PrescriptionForm({
           instructions: d.get("instructions"),
           confidence_threshold: Number(d.get("confidence_threshold")),
         });
+        if (next !== null)
+          setSaved(
+            `${exerciseName} prescribed to ${patientName}: ${d.get("daily_target")} reps a day, ${d.get("starts_on")} to ${d.get("ends_on")}. ${next}`,
+          );
       }}
     >
       <label>
@@ -1905,9 +2007,16 @@ function PrescriptionForm({
           placeholder="Your prescribed range and setup cue"
         />
       </label>
-      <button className="primary" disabled={busy || !patients.length}>
-        Save prescription →
-      </button>
+      <div className="form-actions">
+        <button className="primary" disabled={busy || !patients.length}>
+          {busy ? "Saving…" : "Save prescription →"}
+        </button>
+        {saved && (
+          <p className="form-success" role="status">
+            ✓ {saved}
+          </p>
+        )}
+      </div>
     </form>
   );
 }

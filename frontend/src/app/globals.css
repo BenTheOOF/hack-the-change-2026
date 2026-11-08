@@ -2310,3 +2310,76 @@ legend {
     justify-self: start;
   }
 }
+.check-hint {
+  margin-left: auto;
+  color: #a8662d;
+  font-size: 12px;
+  font-weight: 600;
+}
+.patient-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 25px;
+}
+.patient-plan-card h2 {
+  font-size: 18px;
+}
+.plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.plan-list li {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f6f0;
+}
+.plan-list .muted {
+  font-size: 12px;
+}
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.form-success {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #e9f0e2;
+  border: 1px solid #d3e1c8;
+  color: #3f6434;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1 1 280px;
+}
+@media (max-width: 700px) {
+  /* Three therapist sections must fit a phone without sideways scrolling. */
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sidebar nav .nav-item {
+    padding: 8px 6px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+  }
+}
+.custom-subhead {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+.custom-list + .custom-subhead {
+  margin-top: 10px;
+}
+.custom-panel {
+  margin-top: 0;
+}

@@ -77,3 +77,9 @@ The engine now describes every movement with a `MovementSpec` (primary angle, di
 ## 2026-11-07: trim the demo video before training
 
 Therapists can upload or record a longer video (up to 10 minutes and 50 MiB; recordings stop at 3 minutes) and choose the part used for the model with start and end handles, between 2 and 60 seconds. Only that part is analysed; demo keypoints start at 0 at the trim start. The original file is uploaded unchanged and the trim is stored as `demo_start_ms` and `demo_end_ms` (migration `20261108030000_custom_exercise_trim.sql`); every player loops between those times. This avoids re-encoding in the browser, which would be slow, lose quality, and is unavailable in Safari. The API rejects trims outside 2 to 60 seconds or keypoints that run past the trim.
+
+## 2026-11-07: distance check from torso length; therapist sections
+
+The "Comfortable distance" check used the vertical spread of the exercise's own joints. That shrinks during a squat, is tiny for arm-only custom exercises, and is skewed side-on, where the far side is hidden. It now uses torso length (shoulder to hip, on the clearer side, aspect-corrected) in frame heights: 0.12 to 0.34 passes, which roughly matches a standing body filling 40% to 100% of the frame and still works seated or side-on. The session shows "Move a little closer" or "Step back a little" when it fails.
+
+The therapist workspace now has sidebar sections like the patient view: Review queue (with a count), Patients & plans (each assigned patient's current plans, from a new `prescriptions` list in the therapist overview, and the prescription form), and Your exercises. Saving a prescription shows a confirmation next to the button with the exercise, patient, target, and dates.

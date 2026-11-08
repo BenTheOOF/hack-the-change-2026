@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   alignLeadIn,
+  distanceCheck,
   movementProgress,
   autoStart,
   demoFrame,
@@ -154,4 +155,20 @@ test("the movement gauge matches the classifier's counting range", () => {
   assert.ok(squat.bandStart < squat.bandEnd);
   assert.equal(movementProgress("squat", 180).position, 0);
   assert.equal(movementProgress("squat", 20).position, 1);
+});
+
+test("the distance check works facing the camera, side-on, and seated", () => {
+  const front = demoFrame("squat", 175, 0).points;
+  assert.equal(distanceCheck(front).ok, true);
+  // Side-on: the far shoulder and hip are hidden, the near side is enough.
+  const side = front.map((p, i) => ([11, 23].includes(i) ? { ...p, visibility: 0.1 } : p));
+  assert.equal(distanceCheck(side).ok, true);
+  // Mid-squat the body is shorter, but the torso is not.
+  assert.equal(distanceCheck(demoFrame("squat", 100, 0).points).ok, true);
+  const scale = (k: number) =>
+    front.map((p) => ({ ...p, x: 0.5 + (p.x - 0.5) * k, y: 0.5 + (p.y - 0.5) * k }));
+  assert.equal(distanceCheck(scale(0.4)).hint, "Move a little closer");
+  assert.equal(distanceCheck(scale(1.6)).hint, "Step back a little");
+  const hidden = front.map((p) => ({ ...p, visibility: 0.2 }));
+  assert.equal(distanceCheck(hidden).hint, "Step into view");
 });

@@ -6,6 +6,7 @@ import {
   alignLeadIn,
   autoStart,
   demoFrame,
+  distanceCheck,
   measureSpec,
   drawSkeleton,
   RepSegmenter,
@@ -107,6 +108,9 @@ export function LiveSession({
   const [camera, setCamera] = useState(false),
     [loading, setLoading] = useState(false),
     [active, setActive] = useState(false);
+  // "Move a little closer" or "Step back a little" beside the distance check.
+  const [distanceTip, setDistanceTip] = useState("");
+  const distanceHint = useRef("");
   const [checks, setChecks] = useState({
     body: false,
     light: false,
@@ -391,9 +395,14 @@ export function LiveSession({
                   points[i].y > 0.02 &&
                   points[i].y < 0.98,
               );
-              const height =
-                Math.max(...indices.map((i) => points[i].y)) -
-                Math.min(...indices.map((i) => points[i].y));
+              const distance = distanceCheck(
+                points,
+                video.current.videoWidth / video.current.videoHeight,
+              );
+              if (distance.hint !== distanceHint.current) {
+                distanceHint.current = distance.hint;
+                setDistanceTip(distance.hint);
+              }
               const sample = smallCanvas.current!.getContext("2d", {
                 willReadFrequently: true,
               });
@@ -407,7 +416,7 @@ export function LiveSession({
               }
               const setup = {
                 body,
-                distance: height > 0.35 && height < 0.9,
+                distance: distance.ok,
                 light: brightness > 35 && brightness < 245,
               };
               setChecks(setup);
@@ -792,6 +801,9 @@ export function LiveSession({
                 {checks[key as keyof typeof checks] ? "✓" : "○"}
               </span>
               {label}
+              {key === "distance" && camera && !checks.distance && distanceTip && (
+                <small className="check-hint">{distanceTip}</small>
+              )}
             </div>
           ))}
         </div>

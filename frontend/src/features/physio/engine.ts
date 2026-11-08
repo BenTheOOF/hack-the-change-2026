@@ -293,6 +293,28 @@ export const ruleClassifier: RepClassifier = {
   },
 };
 
+// Distance check from torso length (shoulder to hip), in frame heights. It stays
+// about the same facing the camera, side-on, seated, or mid-squat, unlike the
+// height of the whole body. Uses the clearer side, since side-on hides the other.
+export const TORSO = { min: 0.12, max: 0.34 };
+export function distanceCheck(points: Point[], aspect = 1) {
+  const sides = [
+    [11, 23],
+    [12, 24],
+  ].map(([s, h]) => ({
+    s: points[s],
+    h: points[h],
+    visibility: Math.min(points[s].visibility, points[h].visibility),
+  }));
+  const side = sides[0].visibility >= sides[1].visibility ? sides[0] : sides[1];
+  if (side.visibility < RULES.visible)
+    return { ok: false, torso: 0, hint: "Step into view" };
+  const torso = Math.hypot((side.s.x - side.h.x) * aspect, side.s.y - side.h.y);
+  if (torso < TORSO.min) return { ok: false, torso, hint: "Move a little closer" };
+  if (torso > TORSO.max) return { ok: false, torso, hint: "Step back a little" };
+  return { ok: true, torso, hint: "" };
+}
+
 // Decide when tracking may start on its own: every setup check must hold for
 // holdMs, and any post-rep replay pause must be over. readySince 0 means "not ready".
 export function autoStart(
