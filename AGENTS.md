@@ -14,7 +14,7 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 - Pose estimation: MediaPipe Pose Landmarker, run **in the browser**
 - Backend: Python, FastAPI
 - Database: PostgreSQL
-- Clip storage: S3-compatible object storage (MinIO in dev)
+- Clip storage: existing private Supabase Storage (approved implementation choice)
 - ML: Python (PyTorch / scikit-learn), offline training only
 
 ## Repo layout
@@ -26,10 +26,10 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 
 ## Commands
 <!-- Fill in once set up -->
-- Frontend dev: `TODO`
-- Backend dev: `TODO`
-- Tests: `TODO`
-- Lint/format: `TODO`
+- Frontend dev: `cd frontend && npm run dev`, or `scripts/frontend.ps1` on Windows
+- Backend dev: `cd backend && uv run uvicorn app.main:app --reload`, or `scripts/backend.ps1` on Windows
+- Tests: `cd frontend && npm test && npm run typecheck`; `cd backend && uv run pytest`
+- Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup`
 
 ## Core architecture
 Classify **pose keypoint sequences**, never raw video frames:
@@ -86,4 +86,8 @@ without changes elsewhere.
 
 ## Current status
 <!-- Update as phases complete -->
-- Phase 0: not started (architecture + data model proposal)
+- Phase 0: architecture and data proposal approved by the user.
+- Phase 1: care schema, RLS, and protected API implemented.
+- Phase 2: browser pose session, baseline classifier, history, and daily targets implemented.
+- Phase 3: assigned therapist queue, prescriptions, review corrections, and feedback implemented.
+- Training: intentionally not run. CUDA PyTorch is available in the optional uv ML group.

@@ -1,12 +1,5 @@
-import Link from "next/link";
+import { Landing } from "@/features/physio/landing";
 
-export default function Home() {
-  return (
-    <main>
-      <h1>Hackathon starter</h1>
-      <p>
-        <Link href="/signup">Sign up</Link> · <Link href="/login">Log in</Link> · <Link href="/dashboard">Dashboard</Link>
-      </p>
-    </main>
-  );
+export default function HomePage() {
+  return <Landing />;
 }

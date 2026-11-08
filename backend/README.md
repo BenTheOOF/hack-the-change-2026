@@ -1,84 +1,40 @@
-# backend
+# PhysioTrace API
 
-The FastAPI API. It runs on port 8000 locally (`API_PORT` in `.env` when you use `scripts/dev.sh`) and on Fly in production. Python packages are managed with uv.
+FastAPI, uv-managed Python 3.12.16, and Supabase. Configuration is read from the single root `.env`.
 
-## Setup and run
+## Run
 
-You need uv and the `.env` file in the repo root. The root README explains how to fill it in. `app/config.py` reads it from there, so do not create a second env file here.
-
-1. Run `cd backend`, then `uv sync`.
-2. Run `uv run uvicorn app.main:app --reload --port 8000`.
-3. Open `http://127.0.0.1:8000/health`. Expected: `{"status":"ok"}`.
-
-`./scripts/dev.sh` from the repo root runs the same uvicorn command and starts the frontend as well.
-
-Run the tests with `uv run pytest` in this folder. Expected: `1 passed`.
-
-## What is in here
-
-```
-app/main.py       Creates the app, sets CORS, mounts every router. You should not need to edit it.
-app/config.py     Reads settings from the root .env.
-app/auth.py       get_current_user, the login check.
-app/routers/      One file per group of routes. Files here are mounted automatically.
-tests/            pytest tests.
-supabase/         Database migrations. See supabase/README.md.
-Dockerfile        How Fly builds the image.
-fly.toml          Fly settings: one small machine that stops when idle.
+```powershell
+uv sync
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Add routes
+On the prepared Windows workspace, `..\scripts\backend.ps1` finds the local uv runtime and preserves the installed optional CUDA group.
 
-1. Create `app/routers/<name>.py`:
+`uv sync --group ml` installs CUDA 12.8 PyTorch and NumPy for future offline work. `uv run --group ml python check_cuda.py` performs a tensor smoke check. The API never imports torch and no training runs.
 
-   ```python
-   from fastapi import APIRouter
+## Routes
 
-   router = APIRouter()
+Public routes: `GET /health` and `GET /physio/model`. All saved-care routes use `Depends(get_current_user)` and verify the Supabase token.
 
+| Route | Purpose |
+| --- | --- |
+| `GET /physio/overview?day=YYYY-MM-DD` | Patient plan/progress/feedback or assigned therapist queue |
+| `GET /physio/history?offset=0` | Patient history, 50 records per page |
+| `PATCH /physio/consent` | Separate review and training choices |
+| `POST /physio/sessions` | Begin a consent-snapshotted prescribed session |
+| `POST /physio/sessions/{id}/finish` | Finish the patient's session |
+| `POST /physio/sessions/{id}/reps` | Validate and classify a bounded pose sequence; save once per client identifier |
+| `GET /physio/reps/{id}/pose` | Authorized pose replay |
+| `PUT /physio/reps/{id}/clip` | Consent-checked, uncertain-rep WebM/MP4 upload, at most 10 MiB |
+| `GET /physio/reps/{id}/clip` | Authorized 60-second private clip URL |
+| `POST /physio/reps/{id}/review` | Assigned therapist label and written feedback |
+| `POST /physio/prescriptions` | Assigned therapist exercise prescription |
 
-   @router.get("/hello")
-   def hello():
-       return {"hello": "world"}
-   ```
+Rep results preserve the server-derived exercise day in the patient's IANA timezone. Deterministic classification accepts only finite, bounded 33-point frames. The browser cannot send an authoritative label. Service-only database writes make duplicate submissions idempotent. Review changes the existing rep in one transaction.
 
-2. Save. The dev server reloads and `GET /hello` works. The variable must be called `router`.
+## Data and verification
 
-## Require a login
+Apply the new timestamped care migration after the starter migrations. It creates care roles and assignments, prescriptions, sessions, reps, reviews, explicit offline dataset manifests, and private clip storage. Existing migrations and `app/main.py` are unchanged. Run `supabase/admin-care.sql` with administrator access to grant a therapist role and patient assignment.
 
-Add the dependency to the route:
-
-```python
-from fastapi import Depends
-from app.auth import get_current_user
-
-
-@router.get("/mine")
-def mine(user: dict = Depends(get_current_user)):
-    return {"id": user["id"]}
-```
-
-The browser sends `Authorization: Bearer <access token>`. The API asks Supabase if the token is valid. A bad or missing token gets a 401.
-
-## Add a setting
-
-1. Add the name to the root `.env.example` and your `.env`.
-2. Add a field to `Settings` in `app/config.py`.
-3. Add the name to `scripts/push-env` so Fly gets it.
-
-## Query the database from the API
-
-Call Supabase's REST API with httpx and send the secret key in the `apikey` header only. `app/routers/ai.py` shows the pattern. The secret key skips row-level security, so use it only for work the user must not do directly.
-
-## Add a package
-
-1. Run `uv add <package>` in this folder.
-2. Commit both `pyproject.toml` and `uv.lock`. The Dockerfile installs from the lock file.
-
-## Add a test
-
-Add tests as `tests/test_<name>.py`. Keep the environment lines at the top of `tests/test_health.py`, because settings load when `app.main` is imported.
-
-## Fly
-
-`fly.toml` has the app name and machine size. Run `fly deploy` from this folder. The root README has the full deploy steps.
+`uv run pytest` runs the existing pytest framework. Use `uv run --group ml pytest` to preserve the optional CUDA group. The disposable PostgreSQL checks are documented in the root README. They do not connect to a live care database.

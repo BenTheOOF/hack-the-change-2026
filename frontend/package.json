@@ -2,12 +2,16 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/features/physio/engine.test.ts",
+    "pose:setup": "node scripts/prepare-pose.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.2.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "next": "16.4.4",

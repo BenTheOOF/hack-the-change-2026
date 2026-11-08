@@ -4,6 +4,20 @@ import { NextResponse, type NextRequest } from "next/server";
 // Refreshes the session cookie on every request and sends signed-out visitors away from /dashboard.
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  ) {
+    if (request.nextUrl.pathname.startsWith("/dashboard")) {
+      return NextResponse.redirect(
+        new URL(
+          "/login?error=Connect%20Supabase%20to%20open%20your%20saved%20care%20plan",
+          request.url,
+        ),
+      );
+    }
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +28,9 @@ export async function updateSession(request: NextRequest) {
         setAll(list) {
           list.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
-          list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          list.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
         },
       },
     },
