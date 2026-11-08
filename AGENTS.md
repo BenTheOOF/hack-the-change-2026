@@ -102,4 +102,5 @@ without changes elsewhere.
 - Phase 7 (2026-11-07): therapists add their own exercises with an uploaded or recorded demo video. Pose keypoints are extracted in the browser; the offline worker (`ml/worker.py`) fits a template model (`template-1.0.0`) and marks it ready; the API re-checks custom reps with it. Migration `20261108020000_custom_exercises.sql`. The demo fits in the browser with the TypeScript port.
 - Demo videos can be trimmed before training (start/end stored with the exercise; players loop that part).
 - Distance setup check uses torso length (works facing the camera, side-on, and seated); therapist workspace has Review queue, Patients & plans, and Your exercises sections; prescriptions confirm inline.
+- Pose tracking uses MediaPipe's full model (better for push-ups and floor work) and keeps a rep through misses of up to 600 ms.
 - Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

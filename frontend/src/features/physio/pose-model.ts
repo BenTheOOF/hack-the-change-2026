@@ -16,7 +16,12 @@ function filterMediapipeInfoLogs() {
   };
 }
 
-// Load the pinned lite pose model in VIDEO mode. Throws an error named
+// The "full" model tracks bodies that are not upright (push-ups, floor work)
+// much more reliably than "lite", at roughly twice the cost per frame; at
+// 10 fps that is fine on laptops and recent phones.
+export const POSE_MODEL = "/mediapipe/pose_landmarker_full.task";
+
+// Load the pinned pose model in VIDEO mode. Throws an error named
 // PoseModelError when the browser assets are missing or fail to load.
 export async function createPoseLandmarker(): Promise<PoseLandmarker> {
   filterMediapipeInfoLogs();
@@ -25,13 +30,16 @@ export async function createPoseLandmarker(): Promise<PoseLandmarker> {
     const files = await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
     return await vision.PoseLandmarker.createFromOptions(files, {
       baseOptions: {
-        modelAssetPath: "/mediapipe/pose_landmarker_lite.task",
+        modelAssetPath: POSE_MODEL,
         delegate: "CPU",
       },
       runningMode: "VIDEO",
       numPoses: 1,
-      minPoseDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
+      // Looser than the 0.6 used before: horizontal bodies score lower, and
+      // per-joint visibility still gates what counts (RULES.visible).
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
     });
   } catch (cause) {
     const error = new Error("Pose model failed to load.", { cause });

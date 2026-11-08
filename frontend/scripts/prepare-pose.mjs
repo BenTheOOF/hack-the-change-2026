@@ -10,13 +10,14 @@ await cp(
   path.join(destination, "wasm"),
   { recursive: true },
 );
-const modelPath = path.join(destination, "pose_landmarker_lite.task");
+// The full model: more reliable than lite for floor exercises such as push-ups.
+const modelPath = path.join(destination, "pose_landmarker_full.task");
 try {
   const data = await readFile(modelPath);
   if (data.length < 1_000_000) throw new Error("Incomplete pose model.");
 } catch {
   const response = await fetch(
-    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
   );
   if (!response.ok)
     throw new Error(

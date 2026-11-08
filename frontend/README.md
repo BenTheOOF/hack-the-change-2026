@@ -35,4 +35,4 @@ npm test
 npm run build
 ```
 
-Tests use Node's built-in runner, without adding a test framework. Pose assets are generated into ignored `public/mediapipe/`. `npm run dev` and `npm run build` run `pose:setup` first, so the assets exist before serving or deploying. Without them the camera turns on but pose tracking cannot load. The model path is pinned to MediaPipe's lite float16 version 1.
+Tests use Node's built-in runner, without adding a test framework. Pose assets are generated into ignored `public/mediapipe/`. `npm run dev` and `npm run build` run `pose:setup` first, so the assets exist before serving or deploying. Without them the camera turns on but pose tracking cannot load. The model path is pinned to MediaPipe's full float16 version 1, which tracks floor exercises such as push-ups better than the lite model.

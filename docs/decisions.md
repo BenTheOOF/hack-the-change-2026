@@ -83,3 +83,9 @@ Therapists can upload or record a longer video (up to 10 minutes and 50 MiB; rec
 The "Comfortable distance" check used the vertical spread of the exercise's own joints. That shrinks during a squat, is tiny for arm-only custom exercises, and is skewed side-on, where the far side is hidden. It now uses torso length (shoulder to hip, on the clearer side, aspect-corrected) in frame heights: 0.12 to 0.34 passes, which roughly matches a standing body filling 40% to 100% of the frame and still works seated or side-on. The session shows "Move a little closer" or "Step back a little" when it fails.
 
 The therapist workspace now has sidebar sections like the patient view: Review queue (with a count), Patients & plans (each assigned patient's current plans, from a new `prescriptions` list in the therapist overview, and the prescription form), and Your exercises. Saving a prescription shows a confirmation next to the button with the exercise, patient, target, and dates.
+
+## 2026-11-07: keep tracking through brief misses; full pose model
+
+Floor exercises such as push-ups lost the body often: any frame where MediaPipe found no pose reset the rep in progress and discarded its recording. A miss now keeps the rep, the last skeleton, and the gauge reading for up to 600 ms (`TRACKING_GRACE_MS`, just under the classifier's 700 ms gap limit, so a rep that survives the grace is still judged normally). A longer loss resets as before and tells the patient they went out of view mid-rep.
+
+The browser now uses MediaPipe's full pose model instead of lite (9.4 MB instead of 5.8 MB, fetched by `npm run pose:setup`). It is more reliable for bodies that are not upright, at about twice the cost per frame, which fits within the 100 ms sampling interval. Detection, presence, and tracking confidence went from 0.6 to 0.5; per-joint visibility (`RULES.visible`) still decides what counts. The same model is used to extract keypoints from therapist demo videos.

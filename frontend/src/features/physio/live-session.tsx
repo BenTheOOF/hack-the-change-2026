@@ -7,6 +7,7 @@ import {
   autoStart,
   demoFrame,
   distanceCheck,
+  trackingLoss,
   measureSpec,
   drawSkeleton,
   RepSegmenter,
@@ -92,6 +93,7 @@ export function LiveSession({
     evaluating = useRef(false),
     paused = useRef(false),
     readySince = useRef(0),
+    lostSince = useRef(0),
     resumeAt = useRef(0);
   const spec = movement.spec;
   const segmenter = useRef(new RepSegmenter(spec));
@@ -353,7 +355,11 @@ export function LiveSession({
               visibility: p.visibility ?? 0,
             }));
             const ctx = canvas.current?.getContext("2d");
-            if (points && ctx) {
+            const loss = trackingLoss(lostSince.current, !!points, now);
+            lostSince.current = loss.lostSince;
+            if (!points && !loss.reset) {
+              // A brief miss: keep the last skeleton, reading, and rep in progress.
+            } else if (points && ctx) {
               drawSkeleton(ctx, points, 640, 480);
               const sides = [
                 [0, 11, 23, 27, 31],
@@ -493,12 +499,16 @@ export function LiveSession({
                   discardTakes();
                 if (frames) void evaluate(frames);
               }
-            } else {
+            } else if (!points) {
               ctx?.clearRect(0, 0, 640, 480);
               readySince.current = 0;
               setLiveAngle(null);
               setChecks({ body: false, distance: false, light: false });
-              // Do not join movements on either side of a complete tracking loss.
+              if (segmenter.current.active)
+                setFeedback(
+                  "We lost sight of you mid-rep. Keep your whole body in view, then start the next rep from rest.",
+                );
+              // Do not join movements on either side of a longer tracking loss.
               segmenter.current.reset();
               discardTakes();
             }

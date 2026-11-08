@@ -315,6 +315,22 @@ export function distanceCheck(points: Point[], aspect = 1) {
   return { ok: true, torso, hint: "" };
 }
 
+// Floor exercises such as push-ups make the pose detector miss frames now and
+// then. A miss shorter than the grace keeps the rep going; the classifier
+// already treats gaps over maxGapMs as uncertain. Returns the new lostSince
+// (0 while tracked) and whether the loss has lasted long enough to reset.
+export const TRACKING_GRACE_MS = RULES.maxGapMs - 100;
+export function trackingLoss(
+  lostSince: number,
+  found: boolean,
+  now: number,
+  graceMs = TRACKING_GRACE_MS,
+): { lostSince: number; reset: boolean } {
+  if (found) return { lostSince: 0, reset: false };
+  const since = lostSince || now;
+  return { lostSince: since, reset: now - since > graceMs };
+}
+
 // Decide when tracking may start on its own: every setup check must hold for
 // holdMs, and any post-rep replay pause must be over. readySince 0 means "not ready".
 export function autoStart(

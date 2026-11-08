@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   alignLeadIn,
+  trackingLoss,
   distanceCheck,
   movementProgress,
   autoStart,
@@ -171,4 +172,14 @@ test("the distance check works facing the camera, side-on, and seated", () => {
   assert.equal(distanceCheck(scale(1.6)).hint, "Step back a little");
   const hidden = front.map((p) => ({ ...p, visibility: 0.2 }));
   assert.equal(distanceCheck(hidden).hint, "Step into view");
+});
+
+test("a brief tracking miss keeps the rep, a long one resets it", () => {
+  let state = trackingLoss(0, true, 1000);
+  assert.deepEqual(state, { lostSince: 0, reset: false });
+  state = trackingLoss(state.lostSince, false, 1100);
+  assert.deepEqual(state, { lostSince: 1100, reset: false });
+  assert.equal(trackingLoss(state.lostSince, false, 1700).reset, false);
+  assert.equal(trackingLoss(state.lostSince, false, 1701).reset, true);
+  assert.deepEqual(trackingLoss(state.lostSince, true, 1500), { lostSince: 0, reset: false });
 });
