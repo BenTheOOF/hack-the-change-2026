@@ -17,7 +17,7 @@ push_fly() {
   [ -n "$override" ] && CORS_ORIGINS="$override"
   # Skip empty values: fly secrets import rejects them.
   for k in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SECRET_KEY \
-           CORS_ORIGINS LLM_BASE_URL LLM_API_KEY LLM_MODEL LLM_MAX_TOKENS; do
+           CORS_ORIGINS LLM_BASE_URL LLM_API_KEY LLM_MODEL LLM_MAX_TOKENS ADMIN_EMAILS; do
     [ -n "${!k:-}" ] && echo "$k=${!k}"
   done | fly secrets import -c backend/fly.toml
 }

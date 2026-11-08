@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     llm_api_key: str = Field("", validation_alias="LLM_API_KEY")
     llm_model: str = Field("", validation_alias="LLM_MODEL")
     llm_max_tokens: int = Field(512, validation_alias="LLM_MAX_TOKENS")
+    # Comma-separated emails made admin on their first Google sign-in.
+    admin_emails: str = Field("", validation_alias="ADMIN_EMAILS")
 
 
 settings = Settings()

@@ -38,7 +38,11 @@ class Care:
         except httpx.HTTPError as exc:
             raise HTTPException(503, "Care storage is unavailable. Please retry.") from exc
         if r.is_error:
-            code = r.json().get("code", "") if "json" in r.headers.get("content-type", "") else ""
+            data = r.json() if "json" in r.headers.get("content-type", "") else {}
+            code = data.get("code", "") if isinstance(data, dict) else ""
+            # P0001 messages are written in our own migrations for people to read.
+            if code == "P0001" and data.get("message"):
+                raise HTTPException(409, data["message"])
             if code in ("42501", "P0001") or r.status_code in (401, 403):
                 raise HTTPException(403, "This action is not allowed for this care relationship.")
             if code == "23505":
@@ -51,9 +55,24 @@ class Care:
         if not rows:
             raise HTTPException(409, "Apply the PhysioTrace migration to create your care profile.")
         profile = rows[0]
-        if role and profile["role"] != role:
+        if not profile.get("is_admin") and self.is_env_admin():
+            granted = await self.call("POST", "/rest/v1/rpc/bootstrap_admin", {"p_user": self.user["id"]}, service=True)
+            profile = granted[0] if isinstance(granted, list) else granted
+        # Admins can use the patient and therapist features for their own relationships.
+        if role and profile["role"] != role and not profile.get("is_admin"):
             raise HTTPException(403, f"This action requires a {role} account.")
         return profile
+
+    def is_env_admin(self) -> bool:
+        """True for an ADMIN_EMAILS address whose email Google verified.
+
+        Password sign-ups are not email-confirmed in this project, so anyone could register a listed
+        address by password. Only Google sign-in proves the address.
+        """
+        allowed = {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+        email = (self.user.get("email") or "").lower()
+        providers = (self.user.get("app_metadata") or {}).get("providers") or []
+        return bool(email) and email in allowed and "google" in providers
 
 
 def get_care(user: dict = Depends(get_current_user), authorization: str = Header(default="")) -> Care:
@@ -109,13 +128,20 @@ def model() -> dict:
 
 
 @router.get("/overview")
-async def overview(ctx: Context, day: date | None = None) -> dict:
+async def overview(ctx: Context, day: date | None = None, view: Literal["patient", "therapist"] | None = None) -> dict:
     profile = await ctx.profile()
     chosen = day or datetime.now(timezone.utc).date()
-    if profile["role"] == "therapist":
-        patients = await ctx.call("GET", "/rest/v1/care_assignments?select=patient_id,care_profiles!care_assignments_patient_id_fkey(*)")
-        reps = await ctx.call("GET", f"/rest/v1/exercise_reps?label=eq.inconclusive&select={REP_FIELDS}&order=created_at.asc&limit=100")
-        customs = await ctx.call("GET", f"/rest/v1/custom_exercises?select={CUSTOM_FIELDS}&order=created_at.desc&limit=100")
+    uid = ctx.user["id"]
+    # Admins pick the view; everyone else gets their role's view.
+    as_therapist = view == "therapist" if profile.get("is_admin") and view else profile["role"] == "therapist"
+    if as_therapist:
+        # Filter to this account as the therapist: an admin may also be someone's patient.
+        patients = await ctx.call("GET", f"/rest/v1/care_assignments?therapist_id=eq.{uid}"
+                                         "&select=patient_id,care_profiles!care_assignments_patient_id_fkey(*)")
+        reps = await ctx.call("GET", f"/rest/v1/exercise_reps?label=eq.inconclusive&patient_id=neq.{uid}"
+                                     f"&select={REP_FIELDS}&order=created_at.asc&limit=100")
+        customs = await ctx.call("GET", f"/rest/v1/custom_exercises?therapist_id=eq.{uid}"
+                                        f"&select={CUSTOM_FIELDS}&order=created_at.desc&limit=100")
         # Current and upcoming plans this therapist wrote, for the Patients & plans section.
         plans = await ctx.call("GET", f"/rest/v1/exercise_prescriptions?therapist_id=eq.{ctx.user['id']}"
                                       f"&ends_on=gte.{chosen}&select=*&order=created_at.desc&limit=200")
