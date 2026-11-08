@@ -1080,7 +1080,11 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             />
           ) : role === "therapist" ? (
             page === "assistant" ? (
-              <Assistant token={() => token.current} demo={demo} />
+              <Assistant
+                token={() => token.current}
+                demo={demo}
+                audience="therapist"
+              />
             ) : page === "plans" ? (
               <>
               <div className="page-heading">
