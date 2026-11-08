@@ -872,16 +872,22 @@ legend {
   }
   .nav-item .label-full {
     position: static;
+    flex: 1 1 auto;
+    min-width: 0;
     width: auto;
     height: auto;
     overflow: visible;
     clip: auto;
+    /* Wrap a long label so a count badge stays inside the item. */
+    white-space: normal;
   }
   .nav-item .label-short {
     display: none;
   }
   .nav-number {
     position: static;
+    flex: none;
+    text-align: center;
     margin-left: auto;
     background: var(--tint-sage);
     color: var(--primary);
