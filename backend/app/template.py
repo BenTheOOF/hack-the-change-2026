@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.physio import MAX_GAP_MS, VISIBLE, Evaluation, PoseFrame, angle, tracking_confidence
 
-TEMPLATE_VERSION = "template-1.0.0"
+TEMPLATE_VERSION = "template-1.1.0"
 POINTS = 32
 LEAD_IN_MS = 3000
 
@@ -56,6 +56,8 @@ class TemplateModel(BaseModel):
     tolerance: float = Field(gt=0, le=90)
     minTempoMs: float = Field(ge=0, le=15000)
     demoReps: int = Field(ge=1)
+    # Side-on demos: measure each active angle on the side the camera sees more clearly in the rep.
+    sideAgnostic: bool = False
 
 
 def measure_spec(spec: Spec, frame: PoseFrame) -> tuple[float, float]:
@@ -155,10 +157,19 @@ def percentile(values: list[float], p: float) -> float:
     return s[lo] + (s[hi] - s[lo]) * (i - lo)
 
 
+def clearer_side(frames: list[PoseFrame], k: int) -> int:
+    """The side of an angle's left/right pair (2q, 2q+1) that is more visible across the rep."""
+    base = k - k % 2
+    left = mean(visibility_of(f, base) for f in frames)
+    right = mean(visibility_of(f, base + 1) for f in frames)
+    return base if left >= right else base + 1
+
+
 def template_distance(model: TemplateModel, frames: list[PoseFrame]) -> float | None:
     ts = [f.t for f in frames]
     parts = []
-    for row, k in enumerate(model.active):
+    for row, active_k in enumerate(model.active):
+        k = clearer_side(frames, active_k) if model.sideAgnostic else active_k
         if mean(visibility_of(f, k) for f in frames) < VISIBLE:
             continue
         ys = [angle_of(f, k) for f in frames]

@@ -143,7 +143,7 @@ def test_custom_reps_are_rechecked_with_the_stored_model() -> None:
         assert response.status_code == 201
         evaluation = saved[0]["p_evaluation"]
         assert evaluation["error_type"] == "range_of_motion"
-        assert evaluation["model_version"] == "template-1.0.0"
+        assert evaluation["model_version"] == EXPECTED["version"]  # the stored model's own version
         assert saved[0]["p_exercise"] == "custom"
     finally:
         app.dependency_overrides.clear()

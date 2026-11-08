@@ -16,7 +16,7 @@ import {
   type PoseFrame,
 } from "./engine.ts";
 
-export const TEMPLATE_VERSION = "template-1.0.0";
+export const TEMPLATE_VERSION = "template-1.1.0";
 const POINTS = 32;
 
 // Candidate joint angles, as left/right pairs at indices 2k and 2k+1.
@@ -40,6 +40,9 @@ export type TemplateModel = {
   tolerance: number; // mean absolute degrees allowed from the template
   minTempoMs: number;
   demoReps: number;
+  // Side-on demos: each active angle is measured on whichever side the camera
+  // sees more clearly in the rep, so a patient facing the other way still matches.
+  sideAgnostic?: boolean;
 };
 
 const angleOf = (frame: PoseFrame, k: number) => {
@@ -50,6 +53,15 @@ const angleOf = (frame: PoseFrame, k: number) => {
 const visibilityOf = (frame: PoseFrame, k: number) =>
   Math.min(...ANGLES[k].map((i) => frame.points[i].visibility));
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+// For a side-agnostic model, use the side of an active angle's left/right pair
+// that is more visible across the rep. Indices 2q and 2q+1 form a pair.
+export function clearerSide(frames: PoseFrame[], k: number) {
+  const base = k - (k % 2);
+  const left = mean(frames.map((f) => visibilityOf(f, base)));
+  const right = mean(frames.map((f) => visibilityOf(f, base + 1)));
+  return left >= right ? base : base + 1;
+}
 
 // Linear-interpolated percentile, the same as numpy's default method.
 export function percentile(values: number[], p: number) {
@@ -81,7 +93,8 @@ export function resample(ts: number[], ys: number[], n = POINTS) {
 export function templateDistance(model: TemplateModel, frames: PoseFrame[]) {
   const ts = frames.map((f) => f.t);
   const parts: number[] = [];
-  model.active.forEach((k, row) => {
+  model.active.forEach((activeK, row) => {
+    const k = model.sideAgnostic ? clearerSide(frames, activeK) : activeK;
     if (mean(frames.map((f) => visibilityOf(f, k))) < RULES.visible) return;
     const ys = frames.map((f) => angleOf(f, k));
     const dev = resample(
@@ -164,24 +177,37 @@ export function fitTemplate(
     ),
   );
   const vis = ANGLES.map((_, k) => frames.map((f) => visibilityOf(f, k)));
-  const ranges = series.map((ys, k) => {
-    const good = ys.filter((_, i) => vis[k][i] >= RULES.visible);
+  const rangeOf = (ys: number[], vs: number[]) => {
+    const good = ys.filter((_, i) => vs[i] >= RULES.visible);
     if (good.length < 0.6 * ys.length) return 0;
     return percentile(good, 0.95) - percentile(good, 0.05);
+  };
+  const ranges = series.map((ys, k) => rangeOf(ys, vis[k]));
+  // Side-on, MediaPipe still guesses the hidden far limb, often with a noisy,
+  // exaggerated range. Score each left/right pair by following the clearer
+  // side frame by frame, so the hidden side never drives the fit.
+  const pairRanges = [0, 1, 2, 3].map((q) => {
+    const pick = frames.map((_, i) => (vis[2 * q][i] >= vis[2 * q + 1][i] ? 2 * q : 2 * q + 1));
+    return rangeOf(
+      pick.map((k, i) => series[k][i]),
+      pick.map((k, i) => vis[k][i]),
+    );
   });
-  // Primary pair: the left/right pair with the largest single-side range.
+  const pairVisibility = [0, 1, 2, 3].map((q) =>
+    mean(frames.map((_, i) => Math.max(vis[2 * q][i], vis[2 * q + 1][i]))),
+  );
+  const side = view === "side";
+  const score = (q: number) =>
+    side ? pairRanges[q] : Math.max(ranges[2 * q], ranges[2 * q + 1]);
   let pair = 0;
-  for (let q = 1; q < 4; q++)
-    if (Math.max(ranges[2 * q], ranges[2 * q + 1]) > Math.max(ranges[2 * pair], ranges[2 * pair + 1]))
-      pair = q;
+  for (let q = 1; q < 4; q++) if (score(q) > score(pair)) pair = q;
   const [rl, rr] = [ranges[2 * pair], ranges[2 * pair + 1]];
-  if (Math.max(rl, rr) < 25)
+  if (score(pair) < 25)
     throw new FitError("Not enough movement was found. Keep the whole movement in view.");
-  const combine: MovementSpec["combine"] =
-    Math.min(rl, rr) >= 0.6 * Math.max(rl, rr)
-      ? view === "front"
-        ? "mean"
-        : "visible"
+  const combine: MovementSpec["combine"] = side
+    ? "visible"
+    : Math.min(rl, rr) >= 0.6 * Math.max(rl, rr)
+      ? "mean"
       : rl >= rr
         ? "left"
         : "right";
@@ -197,10 +223,18 @@ export function fitTemplate(
   };
   const primary = frames.map((f) => measureSpec(base, f.points, f.aspect_ratio));
   const goodPrimary = primary.filter((v) => v.quality >= RULES.visible).map((v) => v.angle);
-  const rest = percentile(goodPrimary.slice(0, 10), 0.5);
+  // Rest is the end of the range the demo starts and ends at. Use both ends of
+  // the clip, so a trim that starts mid-rep still finds the right end, then take
+  // the median of the frames that dwell near it.
   const lowP = percentile(goodPrimary, 0.05);
   const highP = percentile(goodPrimary, 0.95);
-  const far = Math.abs(highP - rest) >= Math.abs(lowP - rest) ? highP : lowP;
+  const edges = percentile([...goodPrimary.slice(0, 10), ...goodPrimary.slice(-10)], 0.5);
+  const restEnd = Math.abs(edges - lowP) <= Math.abs(edges - highP) ? lowP : highP;
+  const far = restEnd === lowP ? highP : lowP;
+  const rest = percentile(
+    goodPrimary.filter((a) => Math.abs(a - restEnd) <= 0.15 * (highP - lowP)),
+    0.5,
+  );
   const direction: 1 | -1 = far >= rest ? 1 : -1;
   const excursion = Math.abs(far - rest);
   if (excursion < 25)
@@ -230,18 +264,23 @@ export function fitTemplate(
     from: clamp(rest - direction * 0.15 * excursion),
     to: clamp(spec.bandEnd + direction * 0.15 * excursion),
   };
-  // Active angles: clearly visible and moving at least 15 degrees, largest first.
-  const active = ranges
-    .map((r, k) => ({ r, k, v: mean(vis[k]) }))
+  // Active angles: clearly visible and moving at least 15 degrees, largest
+  // first. Side-on they are pairs (stored as the left index), measured on the
+  // clearer side of each rep.
+  const candidates = side
+    ? pairRanges.map((r, q) => ({ r, k: 2 * q, v: pairVisibility[q] }))
+    : ranges.map((r, k) => ({ r, k, v: mean(vis[k]) }));
+  const active = candidates
     .filter((a) => a.r >= 15 && a.v >= 0.6)
     .sort((a, b) => b.r - a.r || a.k - b.k)
     .slice(0, 4)
     .map((a) => a.k)
     .sort((a, b) => a - b);
-  if (!active.length) active.push(rl >= rr ? 2 * pair : 2 * pair + 1);
+  if (!active.length) active.push(side || rl >= rr ? 2 * pair : 2 * pair + 1);
   const curves = reps.map((r) => {
     const ts = r.map((f) => f.t);
-    return active.map((k) => {
+    return active.map((activeK) => {
+      const k = side ? clearerSide(r, activeK) : activeK;
       const ys = r.map((f) => angleOf(f, k));
       return resample(ts, ys.map((y) => y - ys[0]));
     });
@@ -262,6 +301,7 @@ export function fitTemplate(
     tolerance: Math.max(15, 2 * mean(spread) + 6),
     minTempoMs: Math.max(600, 0.5 * mean(durations)),
     demoReps: reps.length,
+    ...(side ? { sideAgnostic: true } : {}),
   };
   const passed = reps.filter((r) => classifyTemplate(model, r, 0.6).label === "correct").length;
   if (passed * 2 <= reps.length)

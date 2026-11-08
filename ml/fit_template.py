@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from app.physio import VISIBLE, PoseFrame  # noqa: E402
 from app.template import (  # noqa: E402
     ANGLES, POINTS, TEMPLATE_VERSION, Segmenter, Spec, TemplateModel, angle_of, classify_template,
-    measure_spec, percentile, resample, trim_spec_lead_in, visibility_of,
+    clearer_side, measure_spec, percentile, resample, trim_spec_lead_in, visibility_of,
 )
 
 
@@ -37,20 +37,35 @@ def fit_template(frames: list[PoseFrame], view: Literal["front", "side"]) -> Tem
     # 3-frame median, endpoints unchanged.
     series[:, 1:-1] = np.median(np.stack([raw[:, :-2], raw[:, 1:-1], raw[:, 2:]]), axis=0)
     vis = np.array([[visibility_of(f, k) for f in frames] for k in range(len(ANGLES))])
-    ranges = []
-    for k in range(len(ANGLES)):
-        good = series[k][vis[k] >= VISIBLE].tolist()
-        ranges.append(0.0 if len(good) < 0.6 * len(frames) else percentile(good, 0.95) - percentile(good, 0.05))
+    def range_of(ys: np.ndarray, vs: np.ndarray) -> float:
+        good = ys[vs >= VISIBLE].tolist()
+        return 0.0 if len(good) < 0.6 * len(frames) else percentile(good, 0.95) - percentile(good, 0.05)
+
+    ranges = [range_of(series[k], vis[k]) for k in range(len(ANGLES))]
+    # Side-on, MediaPipe still guesses the hidden far limb, often with a noisy, exaggerated range.
+    # Score each left/right pair by following the clearer side frame by frame.
+    pair_ranges, pair_visibility = [], []
+    for q in range(4):
+        pick = np.where(vis[2 * q] >= vis[2 * q + 1], 2 * q, 2 * q + 1)
+        cols = np.arange(len(frames))
+        pair_ranges.append(range_of(series[pick, cols], vis[pick, cols]))
+        pair_visibility.append(float(np.maximum(vis[2 * q], vis[2 * q + 1]).mean()))
+    side = view == "side"
+
+    def score(q: int) -> float:
+        return pair_ranges[q] if side else max(ranges[2 * q], ranges[2 * q + 1])
 
     pair = 0
     for q in range(1, 4):
-        if max(ranges[2 * q], ranges[2 * q + 1]) > max(ranges[2 * pair], ranges[2 * pair + 1]):
+        if score(q) > score(pair):
             pair = q
     rl, rr = ranges[2 * pair], ranges[2 * pair + 1]
-    if max(rl, rr) < 25:
+    if score(pair) < 25:
         raise FitError("Not enough movement was found. Keep the whole movement in view.")
-    if min(rl, rr) >= 0.6 * max(rl, rr):
-        combine = "mean" if view == "front" else "visible"
+    if side:
+        combine = "visible"
+    elif min(rl, rr) >= 0.6 * max(rl, rr):
+        combine = "mean"
     else:
         combine = "left" if rl >= rr else "right"
 
@@ -62,9 +77,13 @@ def fit_template(frames: list[PoseFrame], view: Literal["front", "side"]) -> Tem
     base = spec_with()
     primary = [measure_spec(base, f) for f in frames]
     good_primary = [a for a, q in primary if q >= VISIBLE]
-    rest = percentile(good_primary[:10], 0.5)
+    # Rest is the end of the range the demo starts and ends at. Use both ends of the clip, so a
+    # trim that starts mid-rep still finds it, then take the median of frames dwelling near it.
     low, high = percentile(good_primary, 0.05), percentile(good_primary, 0.95)
-    far = high if abs(high - rest) >= abs(low - rest) else low
+    edges = percentile(good_primary[:10] + good_primary[-10:], 0.5)
+    rest_end = low if abs(edges - low) <= abs(edges - high) else high
+    far = high if rest_end == low else low
+    rest = percentile([a for a in good_primary if abs(a - rest_end) <= 0.15 * (high - low)], 0.5)
     direction = 1 if far >= rest else -1
     excursion = abs(far - rest)
     if excursion < 25:
@@ -89,15 +108,20 @@ def fit_template(frames: list[PoseFrame], view: Literal["front", "side"]) -> Tem
                      bandEnd=band_end, gauge={"from": clamp(rest - direction * 0.15 * excursion),
                                               "to": clamp(band_end + direction * 0.15 * excursion)})
 
-    candidates = [(ranges[k], k) for k in range(len(ANGLES)) if ranges[k] >= 15 and vis[k].mean() >= 0.6]
+    # Side-on, active angles are pairs (stored as the left index), measured on each rep's clearer side.
+    if side:
+        candidates = [(pair_ranges[q], 2 * q) for q in range(4) if pair_ranges[q] >= 15 and pair_visibility[q] >= 0.6]
+    else:
+        candidates = [(ranges[k], k) for k in range(len(ANGLES)) if ranges[k] >= 15 and vis[k].mean() >= 0.6]
     active = sorted(k for _, k in sorted(candidates, key=lambda c: (-c[0], c[1]))[:4])
     if not active:
-        active = [2 * pair if rl >= rr else 2 * pair + 1]
+        active = [2 * pair if side or rl >= rr else 2 * pair + 1]
     curves = []
     for r in reps:
         ts = [f.t for f in r]
         rows = []
-        for k in active:
+        for active_k in active:
+            k = clearer_side(r, active_k) if side else active_k
             ys = [angle_of(f, k) for f in r]
             rows.append(resample(ts, [y - ys[0] for y in ys]))
         curves.append(np.array(rows))
@@ -108,7 +132,7 @@ def fit_template(frames: list[PoseFrame], view: Literal["front", "side"]) -> Tem
         kind="template", version=TEMPLATE_VERSION, spec=spec, active=active,
         template=[[round(float(d), 1) for d in row] for row in template],
         tolerance=max(15.0, 2 * float(np.mean(spread)) + 6),
-        minTempoMs=max(600.0, 0.5 * float(np.mean(durations))), demoReps=len(reps),
+        minTempoMs=max(600.0, 0.5 * float(np.mean(durations))), demoReps=len(reps), sideAgnostic=side,
     )
     assert template.shape == (len(active), POINTS)
     passed = sum(classify_template(model, r, 0.6).label == "correct" for r in reps)

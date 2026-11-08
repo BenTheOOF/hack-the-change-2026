@@ -64,3 +64,40 @@ def test_python_fitter_matches_the_shared_fixture() -> None:
     assert got["active"] == EXPECTED["active"] and got["demoReps"] == 4
     with pytest.raises(FitError):
         fit_template([PoseFrame.model_validate(curl_frame(165, i * 100)) for i in range(40)], "front")
+
+
+PUSHUP = json.loads((ML / "fixtures" / "demo_pushup.json").read_text())
+PUSHUP_EXPECTED = json.loads((ML / "fixtures" / "demo_pushup.expected.json").read_text())
+CASES = json.loads((ML / "fixtures" / "pushup_cases.json").read_text())
+
+
+def segment(model: TemplateModel, stream: list[dict]) -> list[PoseFrame]:
+    segmenter = Segmenter(model.spec)
+    for frame in stream:
+        if done := segmenter.push(PoseFrame.model_validate(frame)):
+            return done
+    raise AssertionError("no rep segmented")
+
+
+def test_side_on_pushups_ignore_the_hidden_arm_and_either_facing() -> None:
+    model = TemplateModel.model_validate(PUSHUP_EXPECTED)
+    assert model.sideAgnostic and model.spec.combine == "visible"
+    labels = {name: classify_template(model, segment(model, stream)) for name, stream in CASES["reps"].items()}
+    assert labels["full"].label == "correct"
+    assert labels["mirrored"].label == "correct"  # patient faces the other way from the demo
+    assert labels["shallow"].error_type == "range_of_motion"
+    assert labels["fast"].error_type == "tempo"
+
+
+def test_pushup_fit_matches_and_survives_a_mid_rep_trim() -> None:
+    pytest.importorskip("numpy")
+    sys.path.insert(0, str(ML))
+    from fit_template import fit_template
+
+    model = fit_template([PoseFrame.model_validate(f) for f in PUSHUP["frames"]], "side")
+    mid = fit_template([PoseFrame.model_validate(f) for f in CASES["demo_mid_rep"]], "side")
+    for got in (model, mid):
+        assert got.spec.joints == TemplateModel.model_validate(PUSHUP_EXPECTED).spec.joints
+        assert got.active == PUSHUP_EXPECTED["active"]
+        for key in ("rest", "move", "bandStart", "bandEnd"):
+            assert getattr(got.spec, key) == pytest.approx(PUSHUP_EXPECTED["spec"][key], abs=1.0), key

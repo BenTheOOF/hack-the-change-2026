@@ -103,4 +103,5 @@ without changes elsewhere.
 - Demo videos can be trimmed before training (start/end stored with the exercise; players loop that part).
 - Distance setup check uses torso length (works facing the camera, side-on, and seated); therapist workspace has Review queue, Patients & plans, and Your exercises sections; prescriptions confirm inline.
 - Pose tracking uses MediaPipe's full model (better for push-ups and floor work) and keeps a rep through misses of up to 600 ms.
+- Template fits `template-1.1.0`: side-on demos follow the visible side and match patients facing either way; rest is found from both ends of the clip.
 - Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

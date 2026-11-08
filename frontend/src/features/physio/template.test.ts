@@ -85,3 +85,39 @@ test("a fitted template routes reps like the backend", () => {
   assert.equal(label(rep(50, { ms: 800 })), "tempo");
   assert.equal(label(rep(50, { visibility: 0.55 })), "tracking");
 });
+
+const pushup = JSON.parse(readFileSync(new URL("demo_pushup.json", ml), "utf8"));
+const pushupExpected: TemplateModel = JSON.parse(
+  readFileSync(new URL("demo_pushup.expected.json", ml), "utf8"),
+);
+const cases = JSON.parse(readFileSync(new URL("pushup_cases.json", ml), "utf8"));
+const segmentStream = (model: TemplateModel, stream: PoseFrame[]) => {
+  const segmenter = new RepSegmenter(model.spec);
+  for (const frame of stream) {
+    const done = segmenter.push(frame);
+    if (done) return done;
+  }
+  throw new Error("no rep segmented");
+};
+
+test("side-on push-ups ignore the hidden arm and work facing either way", () => {
+  const label = (name: string) => {
+    const e = classifyTemplate(pushupExpected, segmentStream(pushupExpected, cases.reps[name]), 0.8);
+    return e.error_type ?? e.label;
+  };
+  assert.equal(label("full"), "correct");
+  assert.equal(label("mirrored"), "correct");
+  assert.equal(label("shallow"), "range_of_motion");
+  assert.equal(label("fast"), "tempo");
+});
+
+test("the browser push-up fit matches Python, even when the trim starts mid-rep", () => {
+  for (const frames of [pushup.frames, cases.demo_mid_rep]) {
+    const model = fitTemplate(frames, "side");
+    assert.equal(model.sideAgnostic, true);
+    assert.equal(model.spec.combine, "visible");
+    assert.deepEqual(model.active, pushupExpected.active);
+    for (const key of ["rest", "move", "bandStart", "bandEnd"] as const)
+      assert.ok(Math.abs(model.spec[key] - pushupExpected.spec[key]) < 1, key);
+  }
+});

@@ -1,6 +1,6 @@
 {
  "kind": "template",
- "version": "template-1.0.0",
+ "version": "template-1.1.0",
  "spec": {
   "joints": [
    [
@@ -16,10 +16,10 @@
   ],
   "combine": "mean",
   "direction": -1,
-  "rest": 142.4630132253016,
-  "move": 125.640048288901,
-  "bandStart": 78.48578463451932,
-  "bandEnd": 9.359505829732797,
+  "rest": 142.15760711909004,
+  "move": 125.39190582760409,
+  "bandStart": 78.39034522632821,
+  "bandEnd": 9.493121001200365,
   "gauge": {
    "from": 180.0,
    "to": 0.0
@@ -101,5 +101,6 @@
  ],
  "tolerance": 15.0,
  "minTempoMs": 1000.0,
- "demoReps": 4
+ "demoReps": 4,
+ "sideAgnostic": false
 }

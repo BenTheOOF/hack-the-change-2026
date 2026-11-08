@@ -393,13 +393,15 @@ export function LiveSession({
                         : best,
                     )
                   : [0, 11, 12, 15, 16, 23, 24, 27, 28];
+              // Joints only need to be inside the frame: hands on the floor at
+              // the bottom of a push-up sit right at the lower edge.
               const body = indices.every(
                 (i) =>
-                  points[i].visibility > 0.5 &&
-                  points[i].x > 0.02 &&
-                  points[i].x < 0.98 &&
-                  points[i].y > 0.02 &&
-                  points[i].y < 0.98,
+                  points[i].visibility >= RULES.visible &&
+                  points[i].x >= 0 &&
+                  points[i].x <= 1 &&
+                  points[i].y >= 0 &&
+                  points[i].y <= 1,
               );
               const distance = distanceCheck(
                 points,

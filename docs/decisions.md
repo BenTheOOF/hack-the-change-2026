@@ -89,3 +89,13 @@ The therapist workspace now has sidebar sections like the patient view: Review q
 Floor exercises such as push-ups lost the body often: any frame where MediaPipe found no pose reset the rep in progress and discarded its recording. A miss now keeps the rep, the last skeleton, and the gauge reading for up to 600 ms (`TRACKING_GRACE_MS`, just under the classifier's 700 ms gap limit, so a rep that survives the grace is still judged normally). A longer loss resets as before and tells the patient they went out of view mid-rep.
 
 The browser now uses MediaPipe's full pose model instead of lite (9.4 MB instead of 5.8 MB, fetched by `npm run pose:setup`). It is more reliable for bodies that are not upright, at about twice the cost per frame, which fits within the 100 ms sampling interval. Detection, presence, and tracking confidence went from 0.6 to 0.5; per-joint visibility (`RULES.visible`) still decides what counts. The same model is used to extract keypoints from therapist demo videos.
+
+## 2026-11-07: side-on demos follow the visible side (template-1.1.0)
+
+A side-on push-up demo produced a target band in the wrong place and a "Body in frame" check that dropped near the floor. Three causes, reproduced with a synthetic side-on push-up fixture (`ml/fixtures/make_demo_pushup.py`, with a hidden far arm that has middling visibility and noisy guesses, as MediaPipe produces):
+
+- The fitter scored left and right joints separately, so the hidden far limb's noisy range could drive the fit and its angles entered the movement-shape check. Side-on fits now follow the clearer side of each left/right pair frame by frame, always use the "visible" combine, and store active angles as pairs (`sideAgnostic`), measured on whichever side the camera sees better in each rep. A patient facing the other way from the demo is measured correctly.
+- Rest came from the first 10 frames, so a trim that started mid-rep put the rest edge at 107 degrees instead of about 147 and moved the band; full push-ups then failed as the wrong movement. Rest is now the end of the range nearest the clip's first and last frames, taken as the median of frames dwelling there.
+- "Body in frame" required joints 2% away from every edge; hands on the floor sit at the bottom edge. Joints now only need to be inside the frame.
+
+Front-view fits are unchanged apart from the rest estimate (the curl fixture's rest edge moved by 0.3 degrees). The model version is `template-1.1.0`; older models still evaluate as before, so exercises fitted earlier need to be added again to get the fix.
