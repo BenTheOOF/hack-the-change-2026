@@ -108,4 +108,5 @@ without changes elsewhere.
 - "Ask PhysioTrace" assistant (patients and therapists) uses `/ai/chat` with a safety system prompt; only the typed conversation is sent, never care data. Favicon and app icons from the pulse mark.
 - Squat target lowered (2026-11-08): `rules-1.2.0` counts a squat when the knee angle at the bottom is 50 to 115 degrees (was 130), in browser and backend; the gauge band follows.
 - Therapist feedback (2026-11-08): each comment in the patient's feed shows the reviewed rep under it, from the on-device clip, else the shared review clip, else the pose replay.
+- Today's plan lists exercises still to do first with a green Start button; finished ones (daily target met) move to the end with a white Practice again button.
 - Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

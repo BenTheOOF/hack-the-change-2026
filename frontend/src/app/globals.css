@@ -2607,14 +2607,14 @@ legend {
 
 /* The reviewed rep under a therapist's comment in the patient's feedback feed. */
 .feedback-clip {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e3e9de;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
   max-width: 480px;
 }
 .feedback-clip-label {
   display: block;
-  font-size: 15px;
+  font-size: var(--text-md);
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
