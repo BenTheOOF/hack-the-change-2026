@@ -4,15 +4,19 @@ from uuid import UUID, uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.auth import get_current_user
 from app.config import settings
-from app.physio import Exercise, MODEL_VERSION, PoseFrame, classify
+from app.physio import MODEL_VERSION, PoseFrame, classify
+from app.template import TEMPLATE_VERSION, TemplateModel, classify_template
 
 router = APIRouter(prefix="/physio", tags=["physio"])
-REP_FIELDS = "id,session_id,prescription_id,patient_id,exercise,exercise_day,label,error_type,confidence,feedback,model_version,clip_path,created_at"
+# The embedded prescription tells the UI which custom exercise a rep belongs to.
+REP_FIELDS = ("id,session_id,prescription_id,patient_id,exercise,exercise_day,label,error_type,confidence,feedback,"
+              "model_version,clip_path,created_at,prescription:exercise_prescriptions(custom_exercise_id)")
+CUSTOM_FIELDS = "id,therapist_id,name,description,steps,view,status,status_detail,model,model_version,demo_video_path,created_at"
 
 
 class Care:
@@ -81,17 +85,26 @@ class ReviewInput(BaseModel):
 
 class PrescriptionInput(BaseModel):
     patient_id: UUID
-    exercise: Exercise
+    exercise: Literal["squat", "shoulder_abduction", "custom"]
+    custom_exercise_id: UUID | None = None
     daily_target: int = Field(ge=1, le=200)
     instructions: str = Field(default="", max_length=2000)
     starts_on: date
     ends_on: date
     confidence_threshold: float = Field(default=0.8, ge=0.6, le=0.99)
 
+    @model_validator(mode="after")
+    def custom_needs_exercise(self) -> "PrescriptionInput":
+        if (self.exercise == "custom") != (self.custom_exercise_id is not None):
+            raise ValueError("Choose a custom exercise for a custom prescription.")
+        return self
+
 
 @router.get("/model")
 def model() -> dict:
-    return {"version": MODEL_VERSION, "kind": "rules", "exercises": ["squat", "shoulder_abduction"], "training_enabled": False}
+    return {"version": MODEL_VERSION, "kind": "rules", "exercises": ["squat", "shoulder_abduction"],
+            "custom": {"kind": "template", "version": TEMPLATE_VERSION, "trained_by": "offline worker"},
+            "training_enabled": False}
 
 
 @router.get("/overview")
@@ -101,12 +114,16 @@ async def overview(ctx: Context, day: date | None = None) -> dict:
     if profile["role"] == "therapist":
         patients = await ctx.call("GET", "/rest/v1/care_assignments?select=patient_id,care_profiles!care_assignments_patient_id_fkey(*)")
         reps = await ctx.call("GET", f"/rest/v1/exercise_reps?label=eq.inconclusive&select={REP_FIELDS}&order=created_at.asc&limit=100")
-        return {"profile": profile, "patients": patients, "queue": reps}
+        customs = await ctx.call("GET", f"/rest/v1/custom_exercises?select={CUSTOM_FIELDS}&order=created_at.desc&limit=100")
+        return {"profile": profile, "patients": patients, "queue": reps, "custom_exercises": customs}
     user_id = ctx.user["id"]
     prescriptions = await ctx.call("GET", f"/rest/v1/exercise_prescriptions?patient_id=eq.{user_id}&starts_on=lte.{chosen}&ends_on=gte.{chosen}&select=*")
     reps = await ctx.call("GET", f"/rest/v1/exercise_reps?patient_id=eq.{user_id}&exercise_day=eq.{chosen}&select={REP_FIELDS}&order=created_at.desc&limit=1000")
     feedback = await ctx.call("GET", f"/rest/v1/rep_reviews?patient_id=eq.{user_id}&select=*&order=created_at.desc&limit=30")
-    return {"profile": profile, "prescriptions": prescriptions, "reps": reps, "feedback": feedback}
+    # RLS shows a patient only the custom exercises prescribed to them.
+    customs = await ctx.call("GET", f"/rest/v1/custom_exercises?select={CUSTOM_FIELDS}&limit=100")
+    return {"profile": profile, "prescriptions": prescriptions, "reps": reps, "feedback": feedback,
+            "custom_exercises": customs}
 
 
 @router.get("/history")
@@ -159,7 +176,14 @@ async def submit_rep(session_id: UUID, data: RepInput, ctx: Context, response: R
     if datetime.now(timezone.utc) - datetime.fromisoformat(session["started_at"].replace("Z", "+00:00")) > timedelta(hours=2):
         raise HTTPException(409, "Start a new session after two hours.")
     plan = session["exercise_prescriptions"]
-    evaluation = classify(plan["exercise"], data.frames, plan["confidence_threshold"])
+    if plan["exercise"] == "custom":
+        rows = await ctx.call("GET", f"/rest/v1/custom_exercises?id=eq.{plan['custom_exercise_id']}&select=model,status")
+        if not rows or rows[0]["status"] != "ready":
+            raise HTTPException(409, "This exercise's model is not ready yet.")
+        evaluation = classify_template(TemplateModel.model_validate(rows[0]["model"]), data.frames,
+                                       plan["confidence_threshold"])
+    else:
+        evaluation = classify(plan["exercise"], data.frames, plan["confidence_threshold"])
     saved = await ctx.call("POST", "/rest/v1/rpc/record_care_rep", {
         "p_patient": ctx.user["id"], "p_session": str(session_id), "p_client_id": str(data.client_rep_id),
         "p_exercise": plan["exercise"],

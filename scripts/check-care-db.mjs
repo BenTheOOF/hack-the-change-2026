@@ -19,15 +19,16 @@ try {
     grant usage on schema auth, public to authenticated, service_role;
     grant execute on function auth.uid() to authenticated, service_role;
   `);
-  await db.exec(
-    await readFile(
-      new URL(
-        "../backend/supabase/migrations/20261108010000_physiotrace.sql",
-        import.meta.url,
+  for (const name of [
+    "20261108010000_physiotrace.sql",
+    "20261108020000_custom_exercises.sql",
+  ])
+    await db.exec(
+      await readFile(
+        new URL("../backend/supabase/migrations/" + name, import.meta.url),
+        "utf8",
       ),
-      "utf8",
-    ),
-  );
+    );
   const patient = "00000000-0000-4000-8000-000000000001";
   const therapist = "00000000-0000-4000-8000-000000000002";
   const stranger = "00000000-0000-4000-8000-000000000003";
@@ -186,8 +187,88 @@ try {
       .rows[0].training_consent,
     false,
   );
+  // Custom exercises: owner-only creation, queue claim and finish, prescription gate, visibility.
+  const demoFrames = JSON.stringify(
+    Array.from({ length: 20 }, (_, i) => ({ t: i * 100, points: [] })),
+  );
+  const createSql = `insert into public.custom_exercises(therapist_id,name,view,demo_frames)
+    values($1,'Elbow curl','front',$2::jsonb) returning id`;
+  await asUser(patient);
+  await assert.rejects(db.query(createSql, [patient, demoFrames]));
+  await asUser(therapist);
+  await assert.rejects(
+    db.query(
+      `insert into public.custom_exercises(therapist_id,name,view,demo_frames,status,model)
+      values($1,'Sneaky','front',$2::jsonb,'ready','{}')`,
+      [therapist, demoFrames],
+    ),
+  );
+  const custom = (await db.query(createSql, [therapist, demoFrames])).rows[0].id;
+  const prescribeCustom = `insert into public.exercise_prescriptions(therapist_id,patient_id,exercise,custom_exercise_id,daily_target,starts_on,ends_on)
+    values($1,$2,'custom',$3,8,current_date,current_date+7) returning id`;
+  await assert.rejects(db.query(prescribeCustom, [therapist, patient, custom]));
+  await assert.rejects(db.query("select * from public.claim_custom_exercise()"));
+  await db.exec("reset role; set role service_role");
+  const claimed = (await db.query("select * from public.claim_custom_exercise()")).rows;
+  assert.equal(claimed.length, 1);
+  assert.equal(claimed[0].status, "training");
+  assert.equal(
+    (await db.query("select * from public.claim_custom_exercise()")).rows.length,
+    0,
+  );
+  await db.query(
+    "select public.finish_custom_exercise($1,'{\"kind\":\"template\"}'::jsonb,'template-1.0.0',null)",
+    [custom],
+  );
+  await asUser(patient);
+  assert.equal(
+    (await db.query("select * from public.custom_exercises")).rows.length,
+    0,
+  );
+  await asUser(therapist);
+  const customPlan = (await db.query(prescribeCustom, [therapist, patient, custom])).rows[0].id;
+  await assert.rejects(
+    db.query(
+      `insert into public.exercise_prescriptions(therapist_id,patient_id,exercise,daily_target,starts_on,ends_on)
+      values($1,$2,'custom',8,current_date,current_date+7)`,
+      [therapist, patient],
+    ),
+  );
+  await asUser(patient);
+  assert.equal(
+    (await db.query("select status from public.custom_exercises")).rows[0].status,
+    "ready",
+  );
+  await asUser(stranger);
+  assert.equal(
+    (await db.query("select * from public.custom_exercises")).rows.length,
+    0,
+  );
+  await asUser(patient);
+  await db.exec("select public.set_care_consent(false,false)");
+  const customSession = (
+    await db.query(
+      `insert into public.exercise_sessions(patient_id,prescription_id,timezone,review_consent,training_consent)
+    values($1,$2,'UTC',false,false) returning id`,
+      [patient, customPlan],
+    )
+  ).rows[0].id;
+  await db.exec("reset role; set role service_role");
+  const customRep = (
+    await db.query(
+      "select (public.record_care_rep($1,$2,$3,'custom',$4::jsonb,$5::jsonb)).*",
+      [
+        patient,
+        customSession,
+        "00000000-0000-4000-8000-000000000098",
+        JSON.stringify({ ...evaluation, model_version: "template-1.0.0" }),
+        JSON.stringify(frames),
+      ],
+    )
+  ).rows[0];
+  assert.equal(customRep.exercise, "custom");
   console.log(
-    "Care database checks passed: migration, RLS, roles, retries, review correction, consent revocation. No training ran.",
+    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises. No training ran.",
   );
 } finally {
   await db.close();

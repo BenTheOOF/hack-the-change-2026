@@ -25,6 +25,11 @@ ANGLES: list[tuple[int, int, int]] = [
 ]
 
 
+class DemoFrame(PoseFrame):
+    """A frame of a therapist's demo, which may run up to 60 s (patient reps stop at 20 s)."""
+    t: float = Field(ge=0, le=60000)
+
+
 class Gauge(BaseModel):
     from_: float = Field(alias="from")
     to: float
