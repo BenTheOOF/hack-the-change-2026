@@ -1,4 +1,6 @@
-export type Exercise = "squat" | "shoulder_abduction";
+export type BuiltinExercise = "squat" | "shoulder_abduction";
+// "custom" plans point at a therapist-defined exercise with a fitted template model.
+export type Exercise = BuiltinExercise | "custom";
 export type Point = { x: number; y: number; z: number; visibility: number };
 export type PoseFrame = { t: number; aspect_ratio?: number; points: Point[] };
 export type Evaluation = {
@@ -10,7 +12,7 @@ export type Evaluation = {
 };
 export interface RepClassifier {
   classify(
-    exercise: Exercise,
+    exercise: BuiltinExercise,
     frames: PoseFrame[],
     threshold: number,
   ): Evaluation;
@@ -29,20 +31,73 @@ export const RULES = {
   leadInMs: 3000,
 } as const;
 
-const isMoving = (exercise: Exercise, frame: PoseFrame) => {
-  const { angle, quality } = measure(exercise, frame.points, frame.aspect_ratio);
-  return (
-    quality >= RULES.visible &&
-    (exercise === "squat"
-      ? angle < RULES.squat.move
-      : angle > RULES.shoulder.move)
-  );
+// A movement is described by one primary joint angle. direction is +1 when the
+// angle grows during the movement (arm raise) and -1 when it shrinks (squat).
+// rest/move are the segmentation edges; bandStart..bandEnd is the range that counts.
+export type JointTriple = readonly [number, number, number];
+export type MovementSpec = {
+  joints: readonly [JointTriple, JointTriple];
+  combine: "visible" | "mean" | "left" | "right";
+  direction: 1 | -1;
+  rest: number;
+  move: number;
+  bandStart: number;
+  bandEnd: number;
+  gauge: { from: number; to: number };
+};
+
+export const SPECS: Record<BuiltinExercise, MovementSpec> = {
+  squat: {
+    joints: [
+      [23, 25, 27],
+      [24, 26, 28],
+    ],
+    combine: "visible",
+    direction: -1,
+    rest: RULES.squat.rest,
+    move: RULES.squat.move,
+    bandStart: RULES.squat.depthMax,
+    bandEnd: RULES.squat.depthMin,
+    gauge: { from: 175, to: 40 },
+  },
+  shoulder_abduction: {
+    joints: [
+      [23, 11, 13],
+      [24, 12, 14],
+    ],
+    combine: "mean",
+    direction: 1,
+    rest: RULES.shoulder.rest,
+    move: RULES.shoulder.move,
+    bandStart: RULES.shoulder.peakMin,
+    bandEnd: RULES.shoulder.peakMax,
+    gauge: { from: 10, to: 150 },
+  },
+};
+
+const specOf = (x: BuiltinExercise | MovementSpec) =>
+  typeof x === "string" ? SPECS[x] : x;
+// True when angle is at or beyond edge in the movement direction.
+const past = (spec: MovementSpec, angle: number, edge: number) =>
+  (angle - edge) * spec.direction >= 0;
+export const isResting = (spec: MovementSpec, angle: number) =>
+  (angle - spec.rest) * spec.direction <= 0;
+export const isMovingAngle = (spec: MovementSpec, angle: number) =>
+  (angle - spec.move) * spec.direction > 0;
+
+const isMoving = (spec: MovementSpec, frame: PoseFrame) => {
+  const { angle, quality } = measureSpec(spec, frame.points, frame.aspect_ratio);
+  return quality >= RULES.visible && isMovingAngle(spec, angle);
 };
 
 // Classify from two resting frames before movement, as the segmenter always
 // did. A longer replay lead-in therefore never changes tempo or duration checks.
-export function trimLeadIn(exercise: Exercise, frames: PoseFrame[]) {
-  const first = frames.findIndex((f) => isMoving(exercise, f));
+export function trimLeadIn(
+  movement: BuiltinExercise | MovementSpec,
+  frames: PoseFrame[],
+) {
+  const spec = specOf(movement);
+  const first = frames.findIndex((f) => isMoving(spec, f));
   return first > 2 ? frames.slice(first - 2) : frames;
 }
 
@@ -94,41 +149,44 @@ export function jointAngle(a: Point, b: Point, c: Point, aspect = 1): number {
         Math.PI;
 }
 
-export function measure(exercise: Exercise, points: Point[], aspect = 1) {
-  const joints =
-    exercise === "squat"
-      ? [
-          [23, 25, 27],
-          [24, 26, 28],
-        ]
-      : [
-          [23, 11, 13],
-          [24, 12, 14],
-        ];
-  const values = joints.map(([a, b, c]) =>
+export function measureSpec(spec: MovementSpec, points: Point[], aspect = 1) {
+  const values = spec.joints.map(([a, b, c]) =>
     jointAngle(points[a], points[b], points[c], aspect),
   );
-  const quality = joints.map((j) =>
+  const quality = spec.joints.map((j) =>
     Math.min(...j.map((i) => points[i].visibility)),
   );
-  const side = quality[0] >= quality[1] ? 0 : 1;
-  return exercise === "squat"
-    ? { angle: values[side], quality: quality[side], asymmetry: 0 }
-    : {
-        angle: (values[0] + values[1]) / 2,
-        quality: Math.min(...quality),
-        asymmetry: Math.abs(values[0] - values[1]),
-      };
+  if (spec.combine === "mean")
+    return {
+      angle: (values[0] + values[1]) / 2,
+      quality: Math.min(...quality),
+      asymmetry: Math.abs(values[0] - values[1]),
+    };
+  // A side view can occlude one limb, so "visible" follows the clearer side.
+  const side =
+    spec.combine === "left"
+      ? 0
+      : spec.combine === "right"
+        ? 1
+        : quality[0] >= quality[1]
+          ? 0
+          : 1;
+  return { angle: values[side], quality: quality[side], asymmetry: 0 };
+}
+
+export function measure(exercise: BuiltinExercise, points: Point[], aspect = 1) {
+  return measureSpec(SPECS[exercise], points, aspect);
 }
 
 // Drop lead-in frames recorded before the video started (cutMs, relative to
 // the first frame), keeping at least the two resting frames before movement.
 export function alignLeadIn(
-  exercise: Exercise,
+  movement: BuiltinExercise | MovementSpec,
   frames: PoseFrame[],
   cutMs: number,
 ): PoseFrame[] {
-  const first = frames.findIndex((f) => isMoving(exercise, f));
+  const spec = specOf(movement);
+  const first = frames.findIndex((f) => isMoving(spec, f));
   const limit = first > 2 ? first - 2 : 0;
   let start = 0;
   while (start < limit && frames[start].t < cutMs) start++;
@@ -252,41 +310,53 @@ export function autoStart(
 }
 
 // Where a joint angle sits on the movement gauge beside the camera.
-// position runs 0 (resting) to 1 (deepest/highest shown); the target band is
-// the range that counts, taken from RULES so the gauge matches the classifier.
-const GAUGE = {
-  squat: { from: 175, to: 40 },
-  shoulder_abduction: { from: 10, to: 150 },
-} as const;
-
+// position runs 0 (resting) to 1 (furthest shown); the target band is the
+// range that counts, taken from the spec so the gauge matches the classifier.
 export type MovementZone = "rest" | "approach" | "target" | "over";
 
-export function movementProgress(exercise: Exercise, angle: number) {
-  const { from, to } = GAUGE[exercise];
+const CUES: Record<BuiltinExercise | "custom", Record<MovementZone, string>> = {
+  squat: {
+    rest: "Lower when you are ready",
+    approach: "Go a little lower",
+    target: "Good depth. Stand up slowly",
+    over: "That is deep enough. Come up a little",
+  },
+  shoulder_abduction: {
+    rest: "Raise your arms when ready",
+    approach: "Raise a little higher",
+    target: "Good height. Lower slowly",
+    over: "High enough. Lower a little",
+  },
+  custom: {
+    rest: "Start when you are ready",
+    approach: "Keep going a little further",
+    target: "Good range. Return slowly",
+    over: "That is far enough. Ease back a little",
+  },
+};
+
+export function movementProgress(
+  movement: BuiltinExercise | MovementSpec,
+  angle: number,
+) {
+  const spec = specOf(movement);
+  const { from, to } = spec.gauge;
   const at = (a: number) =>
     Math.max(0, Math.min(1, (a - from) / (to - from)));
-  const squat = exercise === "squat";
-  const [restEdge, bandStart, bandEnd] = squat
-    ? [RULES.squat.rest, RULES.squat.depthMax, RULES.squat.depthMin]
-    : [RULES.shoulder.rest, RULES.shoulder.peakMin, RULES.shoulder.peakMax];
-  const past = (a: number, edge: number) => (squat ? a <= edge : a >= edge);
-  const zone: MovementZone = past(angle, bandEnd) && angle !== bandEnd
-    ? "over"
-    : past(angle, bandStart)
-      ? "target"
-      : past(angle, restEdge) && angle !== restEdge
-        ? "approach"
-        : "rest";
-  const cue = {
-    rest: squat ? "Lower when you are ready" : "Raise your arms when ready",
-    approach: squat ? "Go a little lower" : "Raise a little higher",
-    target: squat ? "Good depth. Stand up slowly" : "Good height. Lower slowly",
-    over: squat ? "That is deep enough. Come up a little" : "High enough. Lower a little",
-  }[zone];
+  const zone: MovementZone =
+    past(spec, angle, spec.bandEnd) && angle !== spec.bandEnd
+      ? "over"
+      : past(spec, angle, spec.bandStart)
+        ? "target"
+        : past(spec, angle, spec.rest) && angle !== spec.rest
+          ? "approach"
+          : "rest";
+  const cue =
+    CUES[typeof movement === "string" ? movement : "custom"][zone];
   return {
     position: at(angle),
-    bandStart: at(bandStart),
-    bandEnd: at(bandEnd),
+    bandStart: at(spec.bandStart),
+    bandEnd: at(spec.bandEnd),
     zone,
     cue,
   };
@@ -297,11 +367,11 @@ export class RepSegmenter {
   private ready: PoseFrame[] = [];
   private restingFrames = 0;
   private moveStart = 0;
-  private exercise: Exercise;
+  private spec: MovementSpec;
   /** Original timestamp of the first frame of the last completed rep. */
   lastStart = 0;
-  constructor(exercise: Exercise) {
-    this.exercise = exercise;
+  constructor(movement: BuiltinExercise | MovementSpec) {
+    this.spec = specOf(movement);
   }
   get active() {
     return this.frames.length > 0;
@@ -313,16 +383,14 @@ export class RepSegmenter {
   }
   push(frame: PoseFrame): PoseFrame[] | null {
     if (frame.points.length !== 33) return null;
-    const { angle, quality } = measure(
-      this.exercise,
+    const { angle, quality } = measureSpec(
+      this.spec,
       frame.points,
       frame.aspect_ratio,
     );
-    const { squat, shoulder, visible } = RULES;
-    const resting =
-      this.exercise === "squat" ? angle >= squat.rest : angle <= shoulder.rest;
-    const moving =
-      this.exercise === "squat" ? angle < squat.move : angle > shoulder.move;
+    const { visible } = RULES;
+    const resting = isResting(this.spec, angle);
+    const moving = isMovingAngle(this.spec, angle);
     if (!this.frames.length) {
       if (quality >= visible && resting) {
         this.ready = [
@@ -401,7 +469,7 @@ export function drawSkeleton(
 }
 
 export function demoFrame(
-  exercise: Exercise,
+  exercise: BuiltinExercise,
   angle: number,
   t: number,
   visibility = 0.97,

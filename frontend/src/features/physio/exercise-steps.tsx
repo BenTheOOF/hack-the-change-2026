@@ -1,11 +1,10 @@
-import { EXERCISES, type Exercise } from "./engine";
 
-export function ExerciseSteps({ exercise }: { exercise: Exercise }) {
+export function ExerciseSteps({ steps }: { steps: readonly string[] }) {
   return (
     <div className="exercise-steps">
       <strong>How to do it</strong>
       <ol>
-        {EXERCISES[exercise].steps.map((step) => (
+        {steps.map((step) => (
           <li key={step}>{step}</li>
         ))}
       </ol>

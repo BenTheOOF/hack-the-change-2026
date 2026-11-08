@@ -14,6 +14,12 @@ import {
 import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
 import {
+  customIdOf,
+  exerciseInfo,
+  movementFor,
+  type CustomExercise,
+} from "./movement";
+import {
   deleteLocalClips,
   getLocalClip,
   localClipIds,
@@ -117,6 +123,11 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     ? reps.filter((r) => r.label === "inconclusive")
     : (overview?.queue ?? []);
   const plans = overview?.prescriptions ?? [];
+  const [customs, setCustoms] = useState<CustomExercise[]>([]);
+  // Playable demo video URLs by custom exercise id (signed, or local in the demo).
+  const [demoVideoUrls, setDemoVideoUrls] = useState<Record<string, string>>({});
+  const info = (item: Parameters<typeof exerciseInfo>[0]) =>
+    exerciseInfo(item, customs);
   const todayReps = reps.filter((r) => r.exercise_day === localDay());
   const accepted = todayReps.filter((r) => r.label === "correct").length;
   const pending = todayReps.filter((r) => r.label === "inconclusive").length;
@@ -146,6 +157,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       setRole(data.profile.role);
       setReps(data.reps ?? []);
       setReviews(data.feedback ?? []);
+      setCustoms(data.custom_exercises ?? []);
       setConsent({
         review_consent: data.profile.review_consent,
         training_consent: data.profile.training_consent,
@@ -661,6 +673,9 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             <LiveSession
               key={session.id}
               plan={session.plan}
+              movement={movementFor(session.plan.exercise, info(session.plan).custom)!}
+              info={info(session.plan)}
+              demoVideoUrl={demoVideoUrls[customIdOf(session.plan) ?? ""]}
               demo={demo}
               uploadConsent={consent.review_consent}
               todayCount={
@@ -753,7 +768,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                                 )?.care_profiles.display_name ?? "Patient")}
                           </strong>
                           <small>
-                            {EXERCISES[rep.exercise].name} ·{" "}
+                            {info(rep).name} ·{" "}
                             {Math.round(rep.confidence * 100)}% confidence
                           </small>
                         </span>
@@ -770,7 +785,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   {selected ? (
                     <>
                       <div className="section-heading">
-                        <h2>{EXERCISES[selected.exercise].short}</h2>
+                        <h2>{info(selected).short}</h2>
                         <span className="badge inconclusive">
                           Needs your review
                         </span>
@@ -974,16 +989,18 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                           </div>
                           <div className="exercise-content">
                             <span className="eyebrow">
-                              {EXERCISES[plan.exercise].focus}
+                              {info(plan).focus}
                             </span>
-                            <h3>{EXERCISES[plan.exercise].name}</h3>
+                            <h3>{info(plan).name}</h3>
                             <p>
                               {plan.instructions ||
                                 (plan.exercise === "squat"
                                   ? "Build a steady foundation, one controlled movement at a time."
-                                  : "Find a little more freedom in every comfortable reach.")}
+                                  : plan.exercise === "custom"
+                                    ? info(plan).instruction
+                                    : "Find a little more freedom in every comfortable reach.")}
                             </p>
-                            <ExerciseSteps exercise={plan.exercise} />
+                            <ExerciseSteps steps={info(plan).steps} />
                             <div className="exercise-progress">
                               <span>
                                 {count}{" "}
@@ -1096,6 +1113,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 ) : (
                   <RepList
                     reps={history}
+                    customs={customs}
                     loadReplay={async (rep) => {
                       const frames: PoseFrame[] = demo
                         ? (rep.frames ?? [])
@@ -1325,10 +1343,12 @@ function Empty({ title, text }: { title: string; text: string }) {
 type Replay = { frames: PoseFrame[]; url?: string; revoke?: boolean };
 function RepList({
   reps,
+  customs,
   loadReplay,
   videoIds,
 }: {
   reps: Rep[];
+  customs: CustomExercise[];
   loadReplay: (rep: Rep) => Promise<Replay>;
   videoIds: Set<string>;
 }) {
@@ -1368,7 +1388,7 @@ function RepList({
               {rep.exercise === "squat" ? "↧" : "↟"}
             </span>
             <div>
-              <strong>{EXERCISES[rep.exercise].name}</strong>
+              <strong>{exerciseInfo(rep, customs).name}</strong>
               <small>
                 {rep.exercise_day} · {Math.round(rep.confidence * 100)}%
                 confidence
@@ -1417,7 +1437,11 @@ function MovementIllustration({
   exercise: Prescription["exercise"];
 }) {
   return (
-    <svg viewBox="0 0 240 200" aria-label={EXERCISES[exercise].name} role="img">
+    <svg
+      viewBox="0 0 240 200"
+      aria-label={exercise === "custom" ? "Therapist exercise" : EXERCISES[exercise].name}
+      role="img"
+    >
       <ellipse
         cx="123"
         cy="176"
@@ -1438,7 +1462,39 @@ function MovementIllustration({
         r="13"
         fill="#f0ae8c"
       />
-      {exercise === "squat" ? (
+      {exercise === "custom" ? (
+        <>
+          <path
+            d="M120 61v58m0 0-18 45m18-45 18 45"
+            fill="none"
+            stroke="#4d6258"
+            strokeWidth="17"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M113 72 92 98l14 22m21-48 21 26-14 22"
+            fill="none"
+            stroke="#f0ae8c"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M78 110q-10-22 6-40m78 40q10-22-6-40"
+            stroke="#b97a5a"
+            strokeWidth="2"
+            fill="none"
+            strokeDasharray="4 4"
+          />
+          <path
+            d="M89 168h19m24 0h19"
+            stroke="#293d36"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
+        </>
+      ) : exercise === "squat" ? (
         <>
           <path
             d="M130 61l-28 49 38 21-22 34"

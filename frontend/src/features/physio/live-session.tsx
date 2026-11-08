@@ -6,17 +6,17 @@ import {
   alignLeadIn,
   autoStart,
   demoFrame,
+  measureSpec,
   drawSkeleton,
-  EXERCISES,
-  measure,
   RepSegmenter,
-  ruleClassifier,
   RULES,
+  type BuiltinExercise,
   type Evaluation,
   type PoseFrame,
 } from "./engine";
 import { ExerciseSteps } from "./exercise-steps";
 import { MovementGauge } from "./movement-gauge";
+import type { ExerciseInfo, Movement } from "./movement";
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
 
@@ -65,6 +65,10 @@ const REPLAY_PAUSE_MS = 3000;
 
 type Props = {
   plan: Prescription;
+  movement: Movement;
+  info: ExerciseInfo;
+  // Therapist's demo video for custom exercises.
+  demoVideoUrl?: string;
   demo: boolean;
   uploadConsent: boolean;
   todayCount: number;
@@ -78,6 +82,9 @@ type Props = {
 
 export function LiveSession({
   plan,
+  movement,
+  info,
+  demoVideoUrl,
   demo,
   uploadConsent,
   todayCount,
@@ -98,14 +105,15 @@ export function LiveSession({
     paused = useRef(false),
     readySince = useRef(0),
     resumeAt = useRef(0);
-  const segmenter = useRef(new RepSegmenter(plan.exercise));
+  const spec = movement.spec;
+  const segmenter = useRef(new RepSegmenter(spec));
   const [userPaused, setUserPaused] = useState(false);
   // Live joint angle for the gauge, and the furthest angle of the current rep.
   const [liveAngle, setLiveAngle] = useState<number | null>(null);
   const [peakAngle, setPeakAngle] = useState<number | null>(null);
   const peak = useRef<number | null>(null);
   const further = (a: number, b: number | null) =>
-    b === null ? a : plan.exercise === "squat" ? Math.min(a, b) : Math.max(a, b);
+    b === null ? a : spec.direction < 0 ? Math.min(a, b) : Math.max(a, b);
   // Whole seconds left before tracking starts; null while checks are not all ready.
   const [holdLeft, setHoldLeft] = useState<number | null>(null);
   const holdShown = useRef<number | null>(null);
@@ -232,13 +240,9 @@ export function LiveSession({
       const clip = take?.blob;
       // Start the saved pose where the video starts, so the overlay lines up.
       const frames = clip
-        ? alignLeadIn(plan.exercise, segment, take.started - segmentStart)
+        ? alignLeadIn(spec, segment, take.started - segmentStart)
         : segment;
-      const local = ruleClassifier.classify(
-        plan.exercise,
-        frames,
-        plan.confidence_threshold,
-      );
+      const local = movement.classify(frames, plan.confidence_threshold);
       setFeedback(local.feedback);
       const saved = await onRep(
         frames,
@@ -384,8 +388,27 @@ export function LiveSession({
                 [0, 11, 23, 27, 31],
                 [0, 12, 24, 28, 32],
               ];
+              // Custom exercises need the joints their model measures.
+              const customJoints = [
+                ...new Set(
+                  spec.combine === "visible"
+                    ? spec.joints[
+                        Math.min(...spec.joints[0].map((i) => points[i].visibility)) >=
+                        Math.min(...spec.joints[1].map((i) => points[i].visibility))
+                          ? 0
+                          : 1
+                      ]
+                    : spec.combine === "left"
+                      ? spec.joints[0]
+                      : spec.combine === "right"
+                        ? spec.joints[1]
+                        : spec.joints.flat(),
+                ),
+              ];
               const indices =
-                plan.exercise === "squat"
+                plan.exercise === "custom"
+                  ? customJoints
+                  : plan.exercise === "squat"
                   ? sides.reduce((best, side) =>
                       Math.min(...side.map((i) => points[i].visibility)) >
                       Math.min(...best.map((i) => points[i].visibility))
@@ -421,8 +444,8 @@ export function LiveSession({
                 light: brightness > 35 && brightness < 245,
               };
               setChecks(setup);
-              const reading = measure(
-                plan.exercise,
+              const reading = measureSpec(
+                spec,
                 points,
                 video.current.videoWidth / video.current.videoHeight,
               );
@@ -524,32 +547,53 @@ export function LiveSession({
   }
 
   async function simulate(kind: "correct" | "incorrect" | "inconclusive") {
-    const angles =
-      plan.exercise === "squat"
-        ? kind === "incorrect"
-          ? [175, 165, 145, 135, 145, 165, 175]
-          : [175, 165, 130, 95, 120, 165, 175]
-        : kind === "incorrect"
-          ? [5, 20, 40, 55, 40, 20, 5]
-          : [5, 20, 55, 90, 55, 20, 5];
-    // Play the simulated movement on the gauge before judging it.
-    peak.current = null;
-    for (const a of angles) {
-      setLiveAngle(a);
-      peak.current = further(a, peak.current);
-      setPeakAngle(peak.current);
-      await new Promise((resolve) => setTimeout(resolve, 160));
-    }
-    await evaluate(
-      angles.map((a, i) =>
+    const sample = info.custom?.sample_rep;
+    let frames: PoseFrame[];
+    if (plan.exercise === "custom") {
+      if (!sample?.length) return;
+      // Replay a demo rep: as recorded, much faster (tempo), or poorly tracked.
+      const span = sample.at(-1)!.t || 1;
+      const scale =
+        kind === "incorrect"
+          ? Math.max(650, 0.7 * (info.custom?.model?.minTempoMs ?? 1000)) / span
+          : 1;
+      frames = sample.map((f) => ({
+        ...f,
+        t: Math.round(f.t * scale),
+        points:
+          kind === "inconclusive"
+            ? f.points.map((p) => ({ ...p, visibility: 0.5 }))
+            : f.points,
+      }));
+    } else {
+      const angles =
+        plan.exercise === "squat"
+          ? kind === "incorrect"
+            ? [175, 165, 145, 135, 145, 165, 175]
+            : [175, 165, 130, 95, 120, 165, 175]
+          : kind === "incorrect"
+            ? [5, 20, 40, 55, 40, 20, 5]
+            : [5, 20, 55, 90, 55, 20, 5];
+      frames = angles.map((a, i) =>
         demoFrame(
-          plan.exercise,
+          plan.exercise as BuiltinExercise,
           a,
           i * 300,
           kind === "inconclusive" ? 0.5 : 0.97,
         ),
-      ),
-    );
+      );
+    }
+    // Play the simulated movement on the gauge before judging it.
+    peak.current = null;
+    const step = plan.exercise === "custom" ? 70 : 160;
+    for (const f of frames) {
+      const a = Math.round(measureSpec(spec, f.points, f.aspect_ratio).angle);
+      setLiveAngle(a);
+      peak.current = further(a, peak.current);
+      setPeakAngle(peak.current);
+      await new Promise((resolve) => setTimeout(resolve, step));
+    }
+    await evaluate(frames);
   }
 
   return (
@@ -558,7 +602,7 @@ export function LiveSession({
         <div className="section-heading">
           <div>
             <span className="eyebrow">YOUR GUIDED SESSION</span>
-            <h1>{EXERCISES[plan.exercise].name}</h1>
+            <h1>{info.name}</h1>
           </div>
           <button
             className="secondary"
@@ -614,7 +658,7 @@ export function LiveSession({
           </span>
         </div>
         <MovementGauge
-          exercise={plan.exercise}
+          movement={movement.key}
           angle={camera || demo ? liveAngle : null}
           peak={peakAngle}
         />
@@ -702,7 +746,7 @@ export function LiveSession({
           </div>
         )}
         <div className="panel steps-panel">
-          <ExerciseSteps exercise={plan.exercise} />
+          <ExerciseSteps steps={info.steps} />
         </div>
         {demo && (
           <div className="demo-controls">
@@ -774,10 +818,23 @@ export function LiveSession({
             </div>
           ))}
         </div>
+        {demoVideoUrl && (
+          <div className="panel demo-video-panel">
+            <span className="eyebrow">YOUR THERAPIST&apos;S DEMO</span>
+            <video
+              src={demoVideoUrl}
+              controls
+              muted
+              loop
+              playsInline
+              aria-label={"Demo of " + info.name}
+            />
+          </div>
+        )}
         <div className="panel soft-panel">
           <span className="eyebrow">YOUR MOVEMENT CUE</span>
           <h3>Slow, steady, comfortable.</h3>
-          <p>{plan.instructions || EXERCISES[plan.exercise].instruction}</p>
+          <p>{plan.instructions || info.instruction}</p>
           <p className="muted">
             Current baseline: joint angles and tracking confidence. Follow your
             therapist’s prescribed range.
