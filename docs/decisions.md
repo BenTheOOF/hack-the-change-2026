@@ -47,3 +47,7 @@ Tracking starts on its own once body-in-frame, lighting, and distance checks hav
 Every rep the camera records is now kept on the patient's device in IndexedDB (newest 60 clips), and the history page plays it with the skeleton overlay. This is local storage, not an upload, so it stays within "video stays on the device". If the browser blocks storage, history falls back to the pose replay.
 
 The therapist review plays the real video first, with a toggle for the skeleton overlay. Uploading a clip to the therapist still requires the patient's review-sharing consent, as required by the project rules; without it the therapist sees the pose replay and a note saying no video was shared. The session screen states which mode is active. In the demo, where nothing leaves the browser, the therapist view plays the local clip of a camera-recorded rep. A patient's history also plays clips they shared from another device, through the existing signed-URL route.
+
+## 2026-11-07: demo data survives refreshes
+
+The demo's reps, therapist reviews, and privacy choices are saved in the browser's localStorage under `physiotrace-demo-v1`, and demo clips use the same on-device clip store as real sessions. Nothing is sent to the server. A "Clear demo data" button in the demo banner, behind a confirmation, removes the saved state and the demo clips. Saving waits until the restore has rendered, so React's development double effects cannot overwrite saved data with the empty starting state. If storage is blocked or full, the demo keeps working in memory.

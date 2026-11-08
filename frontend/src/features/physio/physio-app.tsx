@@ -13,7 +13,12 @@ import {
 } from "./engine";
 import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
-import { getLocalClip, localClipIds, saveLocalClip } from "./local-clips";
+import {
+  deleteLocalClips,
+  getLocalClip,
+  localClipIds,
+  saveLocalClip,
+} from "./local-clips";
 import { PoseReplay } from "./pose-replay";
 import type { Overview, Prescription, Profile, Rep, Review } from "./types";
 
@@ -60,6 +65,15 @@ const demoPlans: Prescription[] = [
     ends_on: "2099-12-31",
   },
 ];
+// Demo data is a per-browser convenience: it survives refreshes until the
+// viewer clears it. Clips live in the on-device clip store, keyed by rep id.
+// ponytail: localStorage caps at a few MB; a long demo may stop saving new reps.
+const DEMO_KEY = "physiotrace-demo-v1";
+type DemoState = {
+  reps: Rep[];
+  reviews: Review[];
+  consent: { review_consent: boolean; training_consent: boolean };
+};
 const sampleFrames = [175, 165, 130, 95, 120, 165, 175].map((a, i) =>
   demoFrame("squat", a, i * 300, 0.5),
 );
@@ -96,6 +110,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
   });
   const [consentOpen, setConsentOpen] = useState(false);
   const [consentDraft, setConsentDraft] = useState(consent);
+  // Saving waits for the restore to render, so an empty first state never overwrites saved data.
+  const [demoReady, setDemoReady] = useState(false);
   const profile = overview?.profile;
   const queue = demo
     ? reps.filter((r) => r.label === "inconclusive")
@@ -172,6 +188,85 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       listener.subscription.unsubscribe();
     };
   }, [demo, load]);
+
+  useEffect(() => {
+    if (!demo) return;
+    let saved: DemoState | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(DEMO_KEY) ?? "null");
+    } catch {
+      /* Storage blocked or unreadable: start with fresh demo data. */
+    }
+    setDemoReady(true);
+    if (!saved) return;
+    const restored = saved;
+    setReviews(restored.reviews ?? []);
+    setConsent(restored.consent);
+    setOverview((current) =>
+      current?.profile.role === "patient"
+        ? { ...current, profile: { ...current.profile, ...restored.consent } }
+        : current,
+    );
+    setReps(restored.reps ?? []);
+    void localClipIds().then(async (ids) => {
+      const urls = new Map<string, string>();
+      for (const rep of restored.reps ?? []) {
+        if (!ids.has(rep.id)) continue;
+        const blob = await getLocalClip(rep.id);
+        if (blob) urls.set(rep.id, URL.createObjectURL(blob));
+      }
+      if (urls.size)
+        setReps((current) =>
+          current.map((r) =>
+            urls.has(r.id) ? { ...r, local_clip_url: urls.get(r.id) } : r,
+          ),
+        );
+    });
+  }, [demo]);
+
+  useEffect(() => {
+    if (!demo || !demoReady) return;
+    const state: DemoState = {
+      // Object URLs die with the page; clips are restored from the clip store.
+      reps: reps.map(({ local_clip_url: _url, ...rep }) => rep),
+      reviews,
+      consent,
+    };
+    try {
+      localStorage.setItem(DEMO_KEY, JSON.stringify(state));
+    } catch {
+      /* Quota reached or storage blocked: keep the demo in memory. */
+    }
+  }, [demo, demoReady, reps, reviews, consent]);
+
+  async function clearDemo() {
+    if (
+      !window.confirm(
+        "Clear all demo reps, therapist feedback, privacy choices, and recorded demo clips from this browser?",
+      )
+    )
+      return;
+    try {
+      localStorage.removeItem(DEMO_KEY);
+    } catch {
+      /* Nothing stored. */
+    }
+    await deleteLocalClips(reps.map((r) => r.id));
+    reps.forEach((r) => r.local_clip_url && URL.revokeObjectURL(r.local_clip_url));
+    const fresh = { review_consent: false, training_consent: false };
+    setReps([]);
+    setReviews([]);
+    setHistory([]);
+    setHistoryVideos(new Set());
+    setConsent(fresh);
+    setSelected(null);
+    setSession(null);
+    setRole("patient");
+    setPage("today");
+    setOverview({ profile: demoPatient, prescriptions: demoPlans });
+    setError("");
+    setNotice("Demo data cleared. You are starting fresh.");
+  }
 
   async function guarded(action: () => Promise<void>) {
     if (busy) return;
@@ -254,7 +349,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     if (video) {
       // Keep every rep's video on this device for the patient's own history.
       rep.local_clip_url = URL.createObjectURL(video);
-      if (!demo) void saveLocalClip(rep.id, video);
+      void saveLocalClip(rep.id, video);
     }
     setReps((current) => [rep, ...current.filter((r) => r.id !== rep.id)]);
     if (
@@ -520,9 +615,21 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
         <main className="workspace">
           {demo && (
             <div className="demo-strip">
-              A space to explore PhysioTrace. Sample data stays in memory and
-              resets on refresh.{" "}
-              <Link href="/signup">Create your account ↗</Link>
+              <span>
+                A space to explore PhysioTrace. Demo data is saved in this
+                browser until you clear it.
+              </span>
+              <span className="demo-strip-actions">
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={!!session || (!reps.length && !reviews.length)}
+                  onClick={() => void clearDemo()}
+                >
+                  Clear demo data
+                </button>
+                <Link href="/signup">Create your account ↗</Link>
+              </span>
             </div>
           )}
           {error && (

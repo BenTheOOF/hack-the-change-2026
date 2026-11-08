@@ -73,3 +73,11 @@ export async function localClipIds(): Promise<Set<string>> {
     return new Set();
   }
 }
+
+export async function deleteLocalClips(ids: Iterable<string>): Promise<void> {
+  try {
+    for (const id of ids) await run("readwrite", (s) => s.delete(id));
+  } catch {
+    /* Nothing stored, or storage unavailable. */
+  }
+}

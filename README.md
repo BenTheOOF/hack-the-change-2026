@@ -20,7 +20,7 @@ Open two PowerShell terminals at the repository root:
 .\scripts\frontend.ps1
 ```
 
-Open [the interactive demo](http://127.0.0.1:3000/demo). It uses sample data in memory, needs no account, and never uploads anything. Use the Patient and Therapist switches to exercise the entire feedback loop. Simulated good, incorrect, and uncertain reps work without camera access.
+Open [the interactive demo](http://127.0.0.1:3000/demo). It needs no account and never uploads anything. Demo reps, feedback, and clips are saved in this browser across refreshes until you press Clear demo data. Use the Patient and Therapist switches to exercise the entire feedback loop. Simulated good, incorrect, and uncertain reps work without camera access.
 
 The backend script creates the single root `.env` from `.env.example` if it is missing. Fill in the Supabase values to use saved care records. The landing page and demo work with blank values. Camera use requires HTTPS or localhost and explicit browser permission. Opening the dev server from a phone at the LAN address over plain HTTP will not expose the camera. The in-app browser of some editors blocks the camera, so test live sessions in Chrome, Edge, Safari, or Firefox.
 

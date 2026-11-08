@@ -1921,3 +1921,19 @@ legend {
     padding-left: 0;
   }
 }
+.demo-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+.demo-strip-actions .text-button {
+  color: #a05e46;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .demo-strip {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
