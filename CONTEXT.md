@@ -16,7 +16,7 @@ A starter for a four-person hackathon team. Sign-in, a database, file storage, r
 | API | FastAPI, uv | `backend`, deployed to Fly (one 256MB machine, stops when idle) |
 | Data | Supabase: Postgres, Auth, Storage, Realtime | `backend/supabase/` |
 | Auth | Email and password only | |
-| LLM | Anthropic Messages API, called from the API only | `backend/app/routers/ai.py` |
+| LLM | Any OpenAI-compatible Chat Completions provider (Gemini by default), called from the API only | `backend/app/routers/ai.py` |
 
 Coolify, n8n, PocketBase and Appwrite were left out on purpose because they overlap with Supabase, Vercel and Fly.
 
@@ -37,7 +37,7 @@ Coolify, n8n, PocketBase and Appwrite were left out on purpose because they over
 - Next.js 16 calls the middleware file `proxy.ts`. On Next.js 15 or older it is `middleware.ts`.
 - Use `getClaims()` to check a session on the server. Do not use `getSession()` for that.
 - `.env` uses `127.0.0.1` for the API, because Node can resolve `localhost` to IPv6 and miss it.
-- `LLM_MODEL` is empty on purpose. Copy a current model id from the provider docs. Do not invent one. The `anthropic-version` header value is in `ai.py`.
+- `LLM_MODEL` is empty on purpose. Copy a current model id from the provider docs. Do not invent one. `LLM_BASE_URL` picks the provider; `ai.py` posts to `{LLM_BASE_URL}/chat/completions` with the key as a Bearer token.
 - Email confirmation is off for the hackathon. With it on, sign-up returns no session and the user goes back to `/login`.
 - `frontend/AGENTS.md` is git-ignored.
 - The Supabase CLI looks for `supabase/` upward from the folder you run it in, so run it from `backend/`. `supabase db push` targets a local database unless you pass `--remote`.

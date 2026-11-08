@@ -99,3 +99,7 @@ A side-on push-up demo produced a target band in the wrong place and a "Body in 
 - "Body in frame" required joints 2% away from every edge; hands on the floor sit at the bottom edge. Joints now only need to be inside the frame.
 
 Front-view fits are unchanged apart from the rest estimate (the curl fixture's rest edge moved by 0.3 degrees). The model version is `template-1.1.0`; older models still evaluate as before, so exercises fitted earlier need to be added again to get the fix.
+
+## 2026-11-07: OpenAI-compatible LLM endpoint
+
+`POST /ai/chat` now calls the OpenAI-compatible Chat Completions API (`{LLM_BASE_URL}/chat/completions`, key as a Bearer token) instead of Anthropic's Messages API, so the team can switch providers by changing settings. The user plans to use Gemini, whose OpenAI-compatible base URL is the default in `.env.example`. `ANTHROPIC_API_KEY` is replaced by `LLM_API_KEY`, and `LLM_BASE_URL` is new; `LLM_MODEL` stays empty until someone copies a current model id from the provider. The request sends `max_tokens`, which Gemini and most compatible providers accept; OpenAI's reasoning models would need `max_completion_tokens`. The daily limit, auth, and the reply shape for the frontend are unchanged, and the LLM is still not used by any care feature.
