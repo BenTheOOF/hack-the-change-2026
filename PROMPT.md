@@ -4,7 +4,7 @@
 
 An AI vision app that detects your movements during an exercise and gives real-time feedback to the user.
 
-## Functions- note that it's not working in succession, just overall function of the app
+## Functions - note that it's not working in succession, just overall function of the app
 
 ## Functions on the client side:
 1. Collect a visual feed of a patient's physical exercise 
