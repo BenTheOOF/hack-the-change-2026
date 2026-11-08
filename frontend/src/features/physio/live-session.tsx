@@ -123,6 +123,10 @@ export function LiveSession({
   const [feedback, setFeedback] = useState(
     "Set up your space, then turn on your camera.",
   );
+  // Shown once, when this session takes today's count up to the daily target.
+  // Tracking pauses until the patient chooses to finish or keep going.
+  const [finishPrompt, setFinishPrompt] = useState(false);
+  const targetPrompted = useRef(todayCount >= plan.daily_target);
   const [error, setError] = useState(""),
     [accepted, setAccepted] = useState(0),
     [pending, setPending] = useState(0);
@@ -223,6 +227,17 @@ export function LiveSession({
       else take.rec.stop();
     });
   };
+
+  useEffect(() => {
+    if (targetPrompted.current || todayCount < plan.daily_target) return;
+    targetPrompted.current = true;
+    paused.current = true;
+    running.current = false;
+    setActive(false);
+    segmenter.current.reset();
+    discardTakes();
+    setFinishPrompt(true);
+  }, [todayCount, plan.daily_target]);
 
   const evaluate = async (segment: PoseFrame[]) => {
     if (evaluating.current) return;
@@ -601,6 +616,18 @@ export function LiveSession({
     await evaluate(frames);
   }
 
+  async function endSession() {
+    stopCamera();
+    setCamera(false);
+    await onClose();
+  }
+
+  function keepGoing() {
+    setFinishPrompt(false);
+    paused.current = false;
+    readySince.current = 0;
+  }
+
   return (
     <section className="session-layout">
       <div>
@@ -612,11 +639,7 @@ export function LiveSession({
           <button
             className="secondary"
             disabled={evaluating.current}
-            onClick={async () => {
-              stopCamera();
-              setCamera(false);
-              await onClose();
-            }}
+            onClick={() => void endSession()}
           >
             End session
           </button>
@@ -651,7 +674,15 @@ export function LiveSession({
               </button>
             </div>
           )}
-          {camera && !active && !userPaused && (
+          {finishPrompt && (
+            <FinishOverlay
+              count={todayCount}
+              target={plan.daily_target}
+              onFinish={() => void endSession()}
+              onContinue={keepGoing}
+            />
+          )}
+          {camera && !active && !userPaused && !finishPrompt && (
             <SetupOverlay
               prompt={setupPrompt(checks, distanceTip, holdLeft)}
               checks={checks}
@@ -683,15 +714,17 @@ export function LiveSession({
           </span>
           <div>
             <strong>
-              {lastLabel === "correct"
-                ? "Rep counted. Keep your pace."
-                : lastLabel === "incorrect"
-                  ? "Let’s adjust that one."
-                  : lastLabel === "inconclusive"
-                    ? "Sent to your therapist for a closer look."
-                    : active
-                      ? "You’re ready. Move at your pace."
-                      : "One repetition at a time."}
+              {finishPrompt
+                ? "Today’s target reached. Nice work."
+                : lastLabel === "correct"
+                  ? "Rep counted. Keep your pace."
+                  : lastLabel === "incorrect"
+                    ? "Let’s adjust that one."
+                    : lastLabel === "inconclusive"
+                      ? "Sent to your therapist for a closer look."
+                      : active
+                        ? "You’re ready. Move at your pace."
+                        : "One repetition at a time."}
             </strong>
             <p>{feedback}</p>
           </div>
@@ -707,7 +740,7 @@ export function LiveSession({
               Resume →
             </button>
           )}
-          {camera && !active && !userPaused && (
+          {camera && !active && !userPaused && !finishPrompt && (
             <span className="auto-start-hint">
               {holdLeft !== null
                 ? "Hold still… starting in " + holdLeft
@@ -907,6 +940,49 @@ function SetupOverlay({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// Daily target reached: tracking is paused until the patient picks one.
+function FinishOverlay({
+  count,
+  target,
+  onFinish,
+  onContinue,
+}: {
+  count: number;
+  target: number;
+  onFinish: () => void;
+  onContinue: () => void;
+}) {
+  const finish = useRef<HTMLButtonElement>(null);
+  useEffect(() => finish.current?.focus(), []);
+  return (
+    <div
+      className="finish-overlay"
+      role="alertdialog"
+      aria-labelledby="finish-title"
+      aria-describedby="finish-detail"
+    >
+      <span className="finish-mark" aria-hidden="true">
+        ✓
+      </span>
+      <strong id="finish-title" className="finish-title">
+        Today&apos;s target reached
+      </strong>
+      <span id="finish-detail" className="finish-detail">
+        {count} of {target} reps done. Extra reps are optional; stop if
+        anything hurts.
+      </span>
+      <div className="finish-actions">
+        <button ref={finish} className="primary" onClick={onFinish}>
+          Finish session
+        </button>
+        <button className="secondary" onClick={onContinue}>
+          Keep going
+        </button>
+      </div>
     </div>
   );
 }
