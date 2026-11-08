@@ -24,6 +24,7 @@ try {
     "20261108020000_custom_exercises.sql",
     "20261108030000_custom_exercise_trim.sql",
     "20261108040000_admin_accounts.sql",
+    "20261108050000_google_names.sql",
   ])
     await db.exec(
       await readFile(
@@ -344,8 +345,26 @@ try {
   );
   // ...and act as a therapist only for the patient assigned to them.
   assert.ok((await db.query("select * from public.exercise_reps where patient_id=$1", [patient])).rows.length > 0);
+  // Google names: a default "Patient" profile picks up the Google name on sign-in; chosen names stay.
+  await db.exec("reset role");
+  const nameOf = async (id) =>
+    (await db.query("select display_name from public.care_profiles where id=$1", [id])).rows[0].display_name;
+  assert.equal(await nameOf(patient), "Patient");
+  await db.query(
+    `update auth.users set raw_user_meta_data='{"full_name":"Pat Google","role":"therapist"}' where id=$1`,
+    [patient],
+  );
+  assert.equal(await nameOf(patient), "Pat Google");
+  assert.equal(
+    (await db.query("select role from public.care_profiles where id=$1", [patient])).rows[0].role,
+    "patient",
+  );
+  await db.query(`update auth.users set raw_user_meta_data='{"full_name":"Someone Else"}' where id=$1`, [patient]);
+  assert.equal(await nameOf(patient), "Pat Google");
+  await db.query(`update auth.users set raw_user_meta_data='{"name":"Not Ada"}' where id=$1`, [admin]);
+  assert.equal(await nameOf(admin), "Ada Admin");
   console.log(
-    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises, demo trims, and admin accounts. No training ran.",
+    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises, demo trims, admin accounts, and Google names. No training ran.",
   );
 } finally {
   await db.close();
