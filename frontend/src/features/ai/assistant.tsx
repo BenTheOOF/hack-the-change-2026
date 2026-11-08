@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Icon } from "@/features/ui/icons";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -67,8 +68,8 @@ export function Assistant({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">QUESTIONS, ANSWERED KINDLY</span>
-          <h1>Ask PhysioTrace.</h1>
+          <span className="eyebrow">Questions, answered kindly</span>
+          <h1>Ask PhysioTrace</h1>
           <p>
             General help with technique, setup, and using the app. Your
             therapist knows your recovery best.
@@ -77,7 +78,8 @@ export function Assistant({
       </div>
       <div className="panel assistant-panel">
         <p className="assistant-notice" role="note">
-          ⓘ General guidance, not medical advice. It does not see your plan or
+          <Icon name="info" size={18} />
+          General guidance, not medical advice. It does not see your plan or
           your camera. Stop if you feel pain and ask your therapist.
         </p>
         {demo ? (
@@ -151,7 +153,7 @@ export function Assistant({
                 placeholder="Ask about technique, setup, or the app…"
               />
               <button className="primary" disabled={sending || !draft.trim()}>
-                {sending ? "Sending…" : "Send →"}
+                {sending ? "Sending…" : "Send"}
               </button>
             </form>
             <p className="muted assistant-limit">

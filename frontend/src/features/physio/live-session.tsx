@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
+import { Icon } from "@/features/ui/icons";
 import {
   alignLeadIn,
   autoStart,
@@ -633,7 +634,7 @@ export function LiveSession({
       <div>
         <div className="section-heading">
           <div>
-            <span className="eyebrow">YOUR GUIDED SESSION</span>
+            <span className="eyebrow">Your guided session</span>
             <h1>{info.name}</h1>
           </div>
           <button
@@ -662,7 +663,9 @@ export function LiveSession({
           />
           {!camera && (
             <div className="camera-placeholder">
-              <div className="camera-symbol">◉</div>
+              <div className="camera-symbol">
+                <Icon name="camera" size={40} />
+              </div>
               <h2>A little space. A little progress.</h2>
               <p>Your camera stays on this device.</p>
               <button
@@ -710,7 +713,17 @@ export function LiveSession({
           aria-live="polite"
         >
           <span className="feedback-icon" aria-hidden="true">
-            {lastLabel === "correct" ? "✓" : lastLabel === "incorrect" ? "↺" : "✦"}
+            <Icon
+              name={
+                lastLabel === "correct"
+                  ? "check"
+                  : lastLabel === "incorrect"
+                    ? "undo"
+                    : lastLabel === "inconclusive"
+                      ? "clock"
+                      : "pulse"
+              }
+            />
           </span>
           <div>
             <strong>
@@ -737,7 +750,7 @@ export function LiveSession({
                 setUserPaused(false);
               }}
             >
-              Resume →
+              Resume
             </button>
           )}
           {camera && !active && !userPaused && !finishPrompt && (
@@ -819,7 +832,7 @@ export function LiveSession({
       </div>
       <aside className="session-aside">
         <div className="panel">
-          <span className="eyebrow">TODAY</span>
+          <span className="eyebrow">Today</span>
           <div className="session-count">
             {todayCount}
             <small> / {plan.daily_target}</small>
@@ -856,7 +869,10 @@ export function LiveSession({
                   checks[key as keyof typeof checks] ? "check-ready" : ""
                 }
               >
-                {checks[key as keyof typeof checks] ? "✓" : "○"}
+                <Icon
+                  name={checks[key as keyof typeof checks] ? "check" : "circle"}
+                  size={18}
+                />
               </span>
               {label}
               {key === "distance" && camera && !checks.distance && distanceTip && (
@@ -867,7 +883,7 @@ export function LiveSession({
         </div>
         {demoVideoUrl && (
           <div className="panel demo-video-panel">
-            <span className="eyebrow">YOUR THERAPIST&apos;S DEMO</span>
+            <span className="eyebrow">Your therapist&apos;s demo</span>
             <TrimmedVideo
               src={demoVideoUrl}
               start={(info.custom?.demo_start_ms ?? 0) / 1000}
@@ -883,7 +899,7 @@ export function LiveSession({
           </div>
         )}
         <div className="panel soft-panel">
-          <span className="eyebrow">YOUR MOVEMENT CUE</span>
+          <span className="eyebrow">Your movement cue</span>
           <h3>Slow, steady, comfortable.</h3>
           <p>{plan.instructions || info.instruction}</p>
           <p className="muted">
@@ -930,7 +946,7 @@ function SetupOverlay({
         <ul className="setup-overlay-checks">
           {items.map(([key, label, short]) => (
             <li key={key} className={checks[key] ? "ready" : ""}>
-              <span aria-hidden="true">{checks[key] ? "✓" : "✕"}</span>
+              <Icon name={checks[key] ? "check" : "x"} size={16} />
               <span className="label-full">{label}</span>
               <span className="label-short">{short}</span>
               <span className="sr-only">
@@ -966,7 +982,7 @@ function FinishOverlay({
       aria-describedby="finish-detail"
     >
       <span className="finish-mark" aria-hidden="true">
-        ✓
+        <Icon name="check" />
       </span>
       <strong id="finish-title" className="finish-title">
         Today&apos;s target reached

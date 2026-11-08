@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/features/ui/icons";
 
 export type Account = {
   id: string;
@@ -63,8 +64,8 @@ export function AdminConsole({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">ACCOUNTS AND ACCESS</span>
-          <h1>Admin console.</h1>
+          <span className="eyebrow">Accounts and access</span>
+          <h1>Admin console</h1>
           <p>
             Set who is a therapist, who can manage accounts, and which patients
             each therapist cares for. Clinical records stay with each patient&apos;s
@@ -73,7 +74,7 @@ export function AdminConsole({
         </div>
         {!demo && (
           <button className="secondary" onClick={onRefresh} disabled={busy}>
-            ↻ Refresh
+            <Icon name="refresh" /> Refresh
           </button>
         )}
       </div>
@@ -110,7 +111,7 @@ export function AdminConsole({
         </div>
         {status && (
           <p className="form-success" role="status">
-            ✓ {status}
+            <Icon name="check" size={18} /> {status}
           </p>
         )}
         <ul className="account-list">
@@ -189,7 +190,7 @@ export function AdminConsole({
                             disabled={busy}
                             onClick={() => void run(onUnassign(account, p))}
                           >
-                            ×
+                            <Icon name="x" size={16} />
                           </button>
                         </span>
                       ))}

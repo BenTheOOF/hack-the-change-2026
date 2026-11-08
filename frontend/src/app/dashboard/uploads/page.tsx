@@ -9,12 +9,14 @@ export default async function UploadsPage() {
   if (!data?.claims) redirect("/login");
 
   return (
-    <main>
-      <h1>Files</h1>
+    <main className="simple-page">
       <p>
-        <Link href="/dashboard">Back</Link>
+        <Link href="/dashboard">Back to dashboard</Link>
       </p>
-      <Uploads userId={data.claims.sub} />
+      <div className="panel">
+        <h1>Files</h1>
+        <Uploads userId={data.claims.sub} />
+      </div>
     </main>
   );
 }
