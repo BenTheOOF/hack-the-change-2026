@@ -12,7 +12,7 @@ try {
     create role service_role bypassrls;
     create schema auth;
     create schema storage;
-    create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
+    create table auth.users(id uuid primary key, email text, raw_user_meta_data jsonb default '{}', raw_app_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql stable as
       $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
     create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
@@ -23,6 +23,8 @@ try {
     "20261108010000_physiotrace.sql",
     "20261108020000_custom_exercises.sql",
     "20261108030000_custom_exercise_trim.sql",
+    "20261108040000_admin_accounts.sql",
+    "20261108050000_google_names.sql",
   ])
     await db.exec(
       await readFile(
@@ -275,8 +277,94 @@ try {
     )
   ).rows[0];
   assert.equal(customRep.exercise, "custom");
+  // Admins: account management only, plus their own patient and therapist use.
+  const admin = "00000000-0000-4000-8000-000000000004";
+  await db.exec("reset role");
+  await db.query(
+    `insert into auth.users(id,email,raw_user_meta_data,raw_app_meta_data)
+     values($1,'ada@example.com','{"full_name":"Ada Admin","role":"therapist"}','{"provider":"google"}')`,
+    [admin],
+  );
+  const adaProfile = (await db.query("select * from public.care_profiles where id=$1", [admin])).rows[0];
+  assert.equal(adaProfile.display_name, "Ada Admin");
+  assert.equal(adaProfile.role, "patient");
+  assert.equal(adaProfile.is_admin, false);
+  await asUser(stranger);
+  await assert.rejects(db.query("select * from public.admin_list_accounts()"));
+  await assert.rejects(db.query("select public.admin_set_role($1,'therapist')", [stranger]));
+  await assert.rejects(db.query("select public.bootstrap_admin($1)", [stranger]));
+  await db.exec("reset role; set role service_role");
+  await db.query("select public.bootstrap_admin($1)", [admin]);
+  await asUser(admin);
+  const accounts = (await db.query("select * from public.admin_list_accounts()")).rows;
+  assert.equal(accounts.length, 4);
+  assert.equal(accounts.find((a) => a.id === admin).provider, "google");
+  assert.equal(accounts.find((a) => a.id === admin).email, "ada@example.com");
+  // Managing accounts gives no access to clinical records.
+  assert.equal((await db.query("select * from public.exercise_reps")).rows.length, 0);
+  await db.query("select public.admin_set_role($1,'therapist')", [stranger]);
+  await db.query("select public.admin_assign($1,$2)", [stranger, patient]);
+  await assert.rejects(db.query("select public.admin_assign($1,$1)", [stranger]));
+  await asUser(stranger);
+  assert.equal(
+    (await db.query("select * from public.care_profiles where id=$1", [patient])).rows.length,
+    1,
+  );
+  await asUser(admin);
+  await db.query("select public.admin_unassign($1,$2)", [stranger, patient]);
+  await asUser(stranger);
+  assert.equal(
+    (await db.query("select * from public.care_profiles where id=$1", [patient])).rows.length,
+    0,
+  );
+  await asUser(admin);
+  await db.query("select public.admin_set_admin($1,true)", [stranger]);
+  await db.query("select public.admin_set_admin($1,false)", [admin]);
+  await asUser(stranger);
+  await assert.rejects(db.query("select public.admin_set_admin($1,false)", [stranger]));
+  await db.query("select public.admin_set_admin($1,true)", [admin]);
+  // An admin with a therapist role can still be a patient of another therapist.
+  await asUser(admin);
+  await db.query("select public.admin_set_role($1,'therapist')", [admin]);
+  await db.query("select public.admin_assign($1,$2)", [therapist, admin]);
+  await db.query("select public.admin_assign($1,$2)", [admin, patient]);
+  await db.exec("select public.set_care_consent(false,false)");
+  await asUser(therapist);
+  const adaPlan = (
+    await db.query(
+      `insert into public.exercise_prescriptions(therapist_id,patient_id,exercise,daily_target,starts_on,ends_on)
+      values($1,$2,'squat',5,current_date,current_date+7) returning id`,
+      [therapist, admin],
+    )
+  ).rows[0].id;
+  await asUser(admin);
+  await db.query(
+    `insert into public.exercise_sessions(patient_id,prescription_id,timezone,review_consent,training_consent)
+    values($1,$2,'UTC',false,false)`,
+    [admin, adaPlan],
+  );
+  // ...and act as a therapist only for the patient assigned to them.
+  assert.ok((await db.query("select * from public.exercise_reps where patient_id=$1", [patient])).rows.length > 0);
+  // Google names: a default "Patient" profile picks up the Google name on sign-in; chosen names stay.
+  await db.exec("reset role");
+  const nameOf = async (id) =>
+    (await db.query("select display_name from public.care_profiles where id=$1", [id])).rows[0].display_name;
+  assert.equal(await nameOf(patient), "Patient");
+  await db.query(
+    `update auth.users set raw_user_meta_data='{"full_name":"Pat Google","role":"therapist"}' where id=$1`,
+    [patient],
+  );
+  assert.equal(await nameOf(patient), "Pat Google");
+  assert.equal(
+    (await db.query("select role from public.care_profiles where id=$1", [patient])).rows[0].role,
+    "patient",
+  );
+  await db.query(`update auth.users set raw_user_meta_data='{"full_name":"Someone Else"}' where id=$1`, [patient]);
+  assert.equal(await nameOf(patient), "Pat Google");
+  await db.query(`update auth.users set raw_user_meta_data='{"name":"Not Ada"}' where id=$1`, [admin]);
+  assert.equal(await nameOf(admin), "Ada Admin");
   console.log(
-    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises and demo trims. No training ran.",
+    "Care database checks passed: migrations, RLS, roles, retries, review correction, consent revocation, custom exercises, demo trims, admin accounts, and Google names. No training ran.",
   );
 } finally {
   await db.close();

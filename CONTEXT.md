@@ -15,7 +15,7 @@ A starter for a four-person hackathon team. Sign-in, a database, file storage, r
 | Web | Next.js 16, App Router, TypeScript, `@supabase/ssr` | `frontend`, deployed to Vercel Hobby |
 | API | FastAPI, uv | `backend`, deployed to Fly (one 256MB machine, stops when idle) |
 | Data | Supabase: Postgres, Auth, Storage, Realtime | `backend/supabase/` |
-| Auth | Email and password only | |
+| Auth | Email and password, or Google through Supabase OAuth | `frontend/src/features/auth`, `frontend/src/app/auth/callback` |
 | LLM | Any OpenAI-compatible Chat Completions provider (Gemini by default), called from the API only | `backend/app/routers/ai.py` |
 
 Coolify, n8n, PocketBase and Appwrite were left out on purpose because they overlap with Supabase, Vercel and Fly.
@@ -38,7 +38,8 @@ Coolify, n8n, PocketBase and Appwrite were left out on purpose because they over
 - Use `getClaims()` to check a session on the server. Do not use `getSession()` for that.
 - `.env` uses `127.0.0.1` for the API, because Node can resolve `localhost` to IPv6 and miss it.
 - `LLM_MODEL` is empty on purpose. Copy a current model id from the provider docs. Do not invent one. `LLM_BASE_URL` picks the provider; `ai.py` posts to `{LLM_BASE_URL}/chat/completions` with the key as a Bearer token.
-- Email confirmation is off for the hackathon. With it on, sign-up returns no session and the user goes back to `/login`.
+- Email confirmation is off for the hackathon. With it on, sign-up returns no session and the user goes back to `/login`. Because it is off, `ADMIN_EMAILS` only grants admin to Google-verified accounts.
+- Roles: `care_profiles.role` is patient or therapist, and `is_admin` is separate. Admins manage accounts through admin-only database functions (`/admin` routes) and use both views for their own relationships, without access to other patients' clinical records.
 - `frontend/AGENTS.md` is git-ignored.
 - The Supabase CLI looks for `supabase/` upward from the folder you run it in, so run it from `backend/`. `supabase db push` targets a local database unless you pass `--remote`.
 - `backend/supabase/config.toml` only matters for `supabase start`.

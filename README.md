@@ -78,13 +78,31 @@ scripts/worker.sh
 
 On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exercises every 5 seconds, and marks each one Ready or Failed with a reason shown to the therapist. Ready exercises can be prescribed like the built-in ones. The demo needs no worker: it fits the model in the browser right away.
 
+## Ask PhysioTrace assistant
+
+Signed-in patients and therapists can open "Ask PhysioTrace" in the sidebar for general questions about technique, camera setup, and the app. It uses the OpenAI-compatible LLM settings in `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; Gemini by default) and allows 20 questions per person per day. Only the typed conversation is sent to the provider, never plans, reps, feedback, or video, and answers always defer to the therapist.
+
 ## Connect Supabase
 
 1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the backend-only `SUPABASE_SECRET_KEY` in the root `.env`. Keep the existing key names.
 2. Apply the migrations from `backend/supabase/migrations/` to your intended local or linked project using the Supabase CLI. No remote migration is applied automatically by this implementation.
-3. Sign up patient and therapist accounts. Every account starts as a patient. Never grant roles from signup metadata.
-4. Run `backend/supabase/admin-care.sql` with database-administrator access and the two auth user IDs to grant the therapist role and establish an assignment. This changes data, not schema.
+3. Sign up patient and therapist accounts, by email or with Google. Every account starts as a patient. Never grant roles from signup metadata.
+4. Make yourself an admin (see below), then open `/dashboard`: the Admin tab sets therapist roles and assigns patients to therapists. Without an admin, `backend/supabase/admin-care.sql` still grants a therapist role and an assignment with database access.
 5. The therapist signs in at `/dashboard` and prescribes an exercise, date range, daily target, confidence threshold, and movement cue. The patient sees that plan after refreshing.
+
+### Google sign-in
+
+1. In Google Cloud, create an OAuth client (type Web application) with the authorized redirect URI `https://<your-project>.supabase.co/auth/v1/callback`.
+2. In the Supabase dashboard, open Authentication > Providers > Google, turn it on, and paste the client ID and secret.
+3. In Authentication > URL Configuration, add `http://localhost:3000/auth/callback` (and your deployed `/auth/callback` URL) to the redirect URLs.
+
+The "Continue with Google" button then signs people in through Supabase and returns to `/auth/callback`. Google accounts start as patients and take their name from Google. For a local `supabase start`, enable the `[auth.external.google]` block in `backend/supabase/config.toml` instead.
+
+### Admins
+
+Admins manage accounts from the Admin tab: set patient or therapist, promote or demote admins (at least one is always kept), and assign or unassign patients. They can also open the Therapist and Patient views for their own relationships. Admins get no access to other patients' reps, clips, or feedback.
+
+To create the first admin, put your email in `ADMIN_EMAILS` in the root `.env` (comma separated) and sign in with Google; the API grants admin on that sign-in. Only Google-verified emails qualify, because email confirmation is off and anyone could otherwise register your address by password. For a password-only admin, run `backend/supabase/admin-grant.sql` with database access.
 
 Use the Supabase CLI from `backend/`. Retain the starter's private storage, RLS, and email/password setup. Native Supabase auth, private storage URLs, and a live camera must still be verified against your configured project.
 
@@ -117,5 +135,7 @@ node scripts/check-care-db.mjs .tools/verification/node_modules/@electric-sql/pg
 ```
 
 These checks execute the migration and test RLS, role protection, retry idempotency, review correction, and consent revocation. They never connect to Supabase or train a model.
+
+Deploying to your own server and domain (AWS or Vultr) is covered step by step in `docs/deployment.md`.
 
 See `docs/architecture.md` for the approved proposal, `docs/decisions.md` for implementation choices, and `docs/verification.md` for the checks and remaining environment limits.

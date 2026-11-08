@@ -7,6 +7,8 @@ export type Profile = {
   role: "patient" | "therapist";
   review_consent: boolean;
   training_consent: boolean;
+  // Admins manage accounts and can use both the patient and therapist views.
+  is_admin?: boolean;
 };
 export type Prescription = {
   id: string;

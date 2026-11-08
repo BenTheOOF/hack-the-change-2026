@@ -103,3 +103,21 @@ Front-view fits are unchanged apart from the rest estimate (the curl fixture's r
 ## 2026-11-07: OpenAI-compatible LLM endpoint
 
 `POST /ai/chat` now calls the OpenAI-compatible Chat Completions API (`{LLM_BASE_URL}/chat/completions`, key as a Bearer token) instead of Anthropic's Messages API, so the team can switch providers by changing settings. The user plans to use Gemini, whose OpenAI-compatible base URL is the default in `.env.example`. `ANTHROPIC_API_KEY` is replaced by `LLM_API_KEY`, and `LLM_BASE_URL` is new; `LLM_MODEL` stays empty until someone copies a current model id from the provider. The request sends `max_tokens`, which Gemini and most compatible providers accept; OpenAI's reasoning models would need `max_completion_tokens`. The daily limit, auth, and the reply shape for the frontend are unchanged, and the LLM is still not used by any care feature.
+
+## 2026-11-07: Google sign-in and admin accounts
+
+Approved by the user before implementation. Sign-in adds Google through Supabase OAuth with PKCE: a server action starts the flow and `/auth/callback` exchanges the code for a session. New Google accounts start as patients; the profile trigger now also reads Google's `full_name` or `name`, and metadata still never grants a role.
+
+Admins are a separate flag (`care_profiles.is_admin`), so an admin can also be a therapist. The user chose account management only: admins list accounts (with email and provider), set patient or therapist, promote or demote admins, and assign or unassign patients through security-definer functions that check the caller is an admin. Clinical read policies are unchanged, so admins see reps, clips, and feedback only for patients assigned to them. Admins can use the patient and therapist experience for their own relationships (sessions, consent, and reviews accept admins), and pick the view with a top-bar switch (`/overview?view=`). At least one admin is always kept, under a row lock.
+
+The user chose that admins can promote other admins and that the first admin comes from `.env`. Because email confirmation is off, `ADMIN_EMAILS` grants admin only to accounts with a Google identity; a password account with the same address is ignored. `backend/supabase/admin-grant.sql` covers password-only setups. Database messages written in our migrations (such as "Keep at least one admin") now reach the user as 409 responses instead of a generic error. The demo has an Admin tab with sample accounts saved in the demo state.
+
+## 2026-11-08: Ask PhysioTrace assistant and favicon
+
+Patients and therapists get an "Ask PhysioTrace" section that chats through `POST /ai/chat`. The user asked for the assistant; of the two options offered (general questions only, or aware of the patient's plan), the more private one was used: only what the user types in the conversation is sent to the LLM provider, never their plan, reps, feedback, or video. A server-side system prompt keeps answers general and short, forbids diagnosis or new prescriptions, defers to the therapist, and tells the user to stop and contact their therapist or a doctor on pain or warning signs. The browser keeps the conversation in memory only and sends the last 10 turns (validated as user or assistant roles, so a client cannot inject a system message). The daily limit of 20 requests still applies. The demo explains that the assistant needs an account. The unused starter `features/ai/chat.tsx` was removed.
+
+The site now has a favicon (`app/favicon.ico` at 16, 32, and 48 px, `app/icon.svg`, and a 180 px `app/apple-icon.png`) drawn from the sidebar's pulse mark on the brand green, generated without image libraries.
+
+## 2026-11-08: Google names for existing accounts
+
+Accounts that signed up with Google before the admin migration kept the default name "Patient", because the old profile trigger only read `display_name`, which Google does not send. Migration `20261108050000_google_names.sql` fills in the Google name (`full_name` or `name`) for profiles still named "Patient", and a trigger on `auth.users` does the same on later sign-ins, since Supabase rewrites the metadata on each OAuth sign-in. A name the person chose is never overwritten, and the metadata still cannot change a role.

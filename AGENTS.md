@@ -84,7 +84,7 @@ without changes elsewhere.
 - 1–2 exercises: bodyweight squat, standing shoulder abduction
 - Rule-based classifier + confidence routing
 - Patient live session + PT review queue + feedback loop
-- Email/password auth with patient and PT roles
+- Email/password and Google auth with patient and PT roles, plus admins
 
 ## Current status
 <!-- Update as phases complete -->
@@ -104,4 +104,6 @@ without changes elsewhere.
 - Distance setup check uses torso length (works facing the camera, side-on, and seated); therapist workspace has Review queue, Patients & plans, and Your exercises sections; prescriptions confirm inline.
 - Pose tracking uses MediaPipe's full model (better for push-ups and floor work) and keeps a rep through misses of up to 600 ms.
 - Template fits `template-1.1.0`: side-on demos follow the visible side and match patients facing either way; rest is found from both ends of the clip.
+- Sign-in: email/password or Google (Supabase OAuth). Admin accounts (`is_admin`) manage roles, admins, and assignments from an Admin tab and can open both views for their own data; the first admin comes from `ADMIN_EMAILS` (Google-verified only) or `backend/supabase/admin-grant.sql`.
+- "Ask PhysioTrace" assistant (patients and therapists) uses `/ai/chat` with a safety system prompt; only the typed conversation is sent, never care data. Favicon and app icons from the pulse mark.
 - Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).
