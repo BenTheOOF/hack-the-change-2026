@@ -17,23 +17,9 @@ import {
 import { ExerciseSteps } from "./exercise-steps";
 import { MovementGauge } from "./movement-gauge";
 import type { ExerciseInfo, Movement } from "./movement";
+import { createPoseLandmarker } from "./pose-model";
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
-
-// MediaPipe's WASM runtime prints glog INFO lines (for example "INFO: Created
-// TensorFlow Lite XNNPACK delegate for CPU.") through console.error, which the
-// Next.js dev overlay reports as errors. Drop only those INFO lines.
-// ponytail: tasks-vision has no log-level option; remove this if it gains one.
-let mediapipeLogFilter = false;
-function filterMediapipeInfoLogs() {
-  if (mediapipeLogFilter) return;
-  mediapipeLogFilter = true;
-  const original = console.error.bind(console);
-  console.error = (...args: unknown[]) => {
-    if (typeof args[0] === "string" && args[0].startsWith("INFO: ")) return;
-    original(...args);
-  };
-}
 
 // Turn browser camera and model-loading failures into steps a patient can act on.
 export function cameraErrorMessage(error: unknown): string {
@@ -321,27 +307,7 @@ export function LiveSession({
         return;
       }
       stream.current = media;
-      filterMediapipeInfoLogs();
-      let pose: PoseLandmarker;
-      try {
-        const vision = await import("@mediapipe/tasks-vision");
-        const files =
-          await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
-        pose = await vision.PoseLandmarker.createFromOptions(files, {
-          baseOptions: {
-            modelAssetPath: "/mediapipe/pose_landmarker_lite.task",
-            delegate: "CPU",
-          },
-          runningMode: "VIDEO",
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.6,
-        });
-      } catch (cause) {
-        const error = new Error("Pose model failed to load.", { cause });
-        error.name = "PoseModelError";
-        throw error;
-      }
+      const pose = await createPoseLandmarker();
       if (!mounted.current || generation.current !== current) {
         pose.close();
         media.getTracks().forEach((t) => t.stop());
@@ -551,20 +517,30 @@ export function LiveSession({
     let frames: PoseFrame[];
     if (plan.exercise === "custom") {
       if (!sample?.length) return;
-      // Replay a demo rep: as recorded, much faster (tempo), or poorly tracked.
-      const span = sample.at(-1)!.t || 1;
-      const scale =
-        kind === "incorrect"
-          ? Math.max(650, 0.7 * (info.custom?.model?.minTempoMs ?? 1000)) / span
-          : 1;
-      frames = sample.map((f) => ({
+      // Replay a demo rep: as recorded, at half range (each joint blended halfway
+      // back toward its starting position), or poorly tracked.
+      const start = sample[0].points;
+      const changed = sample.map((f) => ({
         ...f,
-        t: Math.round(f.t * scale),
-        points:
-          kind === "inconclusive"
-            ? f.points.map((p) => ({ ...p, visibility: 0.5 }))
-            : f.points,
+        points: f.points.map((p, i) =>
+          kind === "incorrect"
+            ? {
+                ...p,
+                x: start[i].x + (p.x - start[i].x) * 0.5,
+                y: start[i].y + (p.y - start[i].y) * 0.5,
+              }
+            : kind === "inconclusive"
+              ? { ...p, visibility: 0.5 }
+              : p,
+        ),
       }));
+      // Cut the rep out with the segmenter, exactly as live tracking would.
+      const last = changed.at(-1)!;
+      const cutter = new RepSegmenter(spec);
+      frames =
+        [...changed, ...[1, 2, 3].map((k) => ({ ...last, t: last.t + k * 100 }))]
+          .map((f) => cutter.push(f))
+          .find((r): r is PoseFrame[] => r !== null) ?? changed;
     } else {
       const angles =
         plan.exercise === "squat"

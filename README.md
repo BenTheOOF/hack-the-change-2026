@@ -68,6 +68,16 @@ uv run --group ml python check_accelerator.py
 
 `check_accelerator.py` picks CUDA first, then MLX, and exits non-zero when neither is usable. There is no CPU fallback. The API and production image do not need the `ml` group. A CUDA check needs an accessible NVIDIA GPU and driver; installing the wheel does not install or change a driver. Intel Macs have no supported accelerator.
 
+## Therapist-defined exercises
+
+Therapists can add their own exercises from the workspace with an uploaded or recorded demo video (up to 60 s, two or more reps, starting and ending at rest). Pose keypoints are extracted in the browser, and a background trainer fits a model:
+
+```bash
+scripts/worker.sh
+```
+
+On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exercises every 5 seconds, and marks each one Ready or Failed with a reason shown to the therapist. Ready exercises can be prescribed like the built-in ones. The demo needs no worker: it fits the model in the browser right away.
+
 ## Connect Supabase
 
 1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the backend-only `SUPABASE_SECRET_KEY` in the root `.env`. Keep the existing key names.

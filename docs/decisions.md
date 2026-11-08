@@ -61,3 +61,15 @@ The segmenter keeps up to 3 s of resting pose before a rep, and the saved pose s
 ## 2026-11-07: movement gauge beside the camera
 
 A vertical gauge next to the camera shows the live knee angle (squat, filling downward) or arm angle (shoulder abduction, filling upward), the counting range as a striped target band, and a marker for the furthest point of the current rep, with a cue such as "Go a little lower" or "Good depth. Stand up slowly". `movementProgress` in `engine.ts` derives the band from the same `RULES` the classifier uses, so the gauge and the label always agree. The reading is shown only when tracking visibility is at least 0.5. Demo reps animate the gauge before they are judged. On phones the camera's idle text is shortened so the camera and gauge fit side by side.
+
+## 2026-11-07: therapist-defined exercises trained from a demo video
+
+Approved by the user before implementation. Therapists add an exercise with a name, steps, camera view, and a demo video they upload or record in the app. The browser extracts pose keypoints from the video at 10 fps with the existing MediaPipe setup, so training uses keypoint sequences, never raw video, and the worker needs no video decoding or new dependencies.
+
+Training runs in a separate Python worker (`ml/worker.py`, started with `scripts/worker.sh`), chosen by the user so the API never trains. It claims queued exercises through a service-only RPC (`for update skip locked`), fits the model, and records ready or failed with a reason the therapist sees. A worker that dies mid-fit leaves the row in `training`; the therapist resubmits (marked `ponytail:`).
+
+The model is a template, not a neural network, because one demo video is too little data for one. The fitter picks the joint angle (elbows, shoulders, hips, knees, left/right pairs) with the largest range, derives the rest and movement edges (20% and 35% of the demo excursion), a counting band (75% to 135% of the mean demo excursion), a minimum rep time (half the demo mean, at least 0.6 s), and a 32-point time-normalized trajectory template of up to four moving joints with a tolerance of at least 15 degrees. A fit is rejected unless most demo reps pass their own model. numpy runs on the CPU here because the fit gains nothing from a GPU; the CUDA/MLX rule applies to future neural-network training.
+
+The evaluator exists in TypeScript (live feedback) and pure Python (the API re-checks custom reps and cannot import numpy). The fitter exists in Python (worker) and TypeScript (the demo, which has no backend, and the instant "Found N reps" preview before a therapist saves). `ml/fixtures/demo_curl.json` and its expected fit are checked by both test suites so the ports cannot drift.
+
+The engine now describes every movement with a `MovementSpec` (primary angle, direction, edges, band); the two built-ins use specs built from `RULES` and behave exactly as before. Custom prescriptions use `exercise = 'custom'` plus `custom_exercise_id`; a trigger allows only the therapist's own ready exercises. Patients see a custom exercise only once it is prescribed to them, and demo videos are served with 10-minute signed URLs.

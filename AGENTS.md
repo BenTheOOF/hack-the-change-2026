@@ -29,6 +29,7 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 - Frontend dev: `cd frontend && npm run dev`, or `scripts/frontend.ps1` on Windows
 - Backend dev: `cd backend && uv run uvicorn app.main:app --reload`, or `scripts/backend.ps1` on Windows
 - ML accelerator check: `cd backend && uv sync --group ml && uv run --group ml python check_accelerator.py`
+- Custom-exercise trainer: `scripts/worker.sh` (or `scripts/worker.ps1`); runs `ml/worker.py`, which fits queued therapist exercises offline
 - Tests: `cd frontend && npm test && npm run typecheck`; `cd backend && uv run pytest`
 - Build: `cd frontend && npm run build`; browser assets: `npm run pose:setup` (runs automatically before dev and build)
 
@@ -98,4 +99,5 @@ without changes elsewhere.
 - Demo data persists in this browser across refreshes (localStorage plus on-device clips) until "Clear demo data" is used.
 - Rep clips include 1.5 to 3 s of lead-in and 0.5 s after the rep; the saved pose is aligned to the video and classification ignores the extra lead-in.
 - Live session has a movement gauge beside the camera (target band from the classifier rules, peak marker, cue).
-- Training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).
+- Phase 7 (2026-11-07): therapists add their own exercises with an uploaded or recorded demo video. Pose keypoints are extracted in the browser; the offline worker (`ml/worker.py`) fits a template model (`template-1.0.0`) and marks it ready; the API re-checks custom reps with it. Migration `20261108020000_custom_exercises.sql`. The demo fits in the browser with the TypeScript port.
+- Neural-network training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

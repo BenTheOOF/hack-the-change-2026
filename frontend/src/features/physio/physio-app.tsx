@@ -7,10 +7,17 @@ import { apiFetch } from "@/lib/api";
 import {
   EXERCISES,
   MODEL_VERSION,
+  RepSegmenter,
   demoFrame,
+  trimLeadIn,
   type Evaluation,
   type PoseFrame,
 } from "./engine";
+import {
+  CustomExerciseForm,
+  trainingStatusLabel,
+  type ExerciseSubmission,
+} from "./custom-exercise-form";
 import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
 import {
@@ -76,10 +83,15 @@ const demoPlans: Prescription[] = [
 // ponytail: localStorage caps at a few MB; a long demo may stop saving new reps.
 const DEMO_KEY = "physiotrace-demo-v1";
 type DemoState = {
+  customs?: CustomExercise[];
+  // Demo prescriptions of custom exercises, shown in the patient's plan.
+  extraPlans?: Prescription[];
   reps: Rep[];
   reviews: Review[];
   consent: { review_consent: boolean; training_consent: boolean };
 };
+// Demo videos live in the on-device clip store under this prefix.
+const demoVideoKey = (id: string) => "demo-video:" + id;
 const sampleFrames = [175, 165, 130, 95, 120, 165, 175].map((a, i) =>
   demoFrame("squat", a, i * 300, 0.5),
 );
@@ -122,8 +134,12 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
   const queue = demo
     ? reps.filter((r) => r.label === "inconclusive")
     : (overview?.queue ?? []);
-  const plans = overview?.prescriptions ?? [];
   const [customs, setCustoms] = useState<CustomExercise[]>([]);
+  const [extraPlans, setExtraPlans] = useState<Prescription[]>([]);
+  const plans = [
+    ...(overview?.prescriptions ?? []),
+    ...(demo && role === "patient" ? extraPlans : []),
+  ];
   // Playable demo video URLs by custom exercise id (signed, or local in the demo).
   const [demoVideoUrls, setDemoVideoUrls] = useState<Record<string, string>>({});
   const info = (item: Parameters<typeof exerciseInfo>[0]) =>
@@ -214,6 +230,16 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     const restored = saved;
     setReviews(restored.reviews ?? []);
     setConsent(restored.consent);
+    setCustoms(restored.customs ?? []);
+    setExtraPlans(restored.extraPlans ?? []);
+    void (async () => {
+      const urls: Record<string, string> = {};
+      for (const c of restored.customs ?? []) {
+        const blob = await getLocalClip(demoVideoKey(c.id));
+        if (blob) urls[c.id] = URL.createObjectURL(blob);
+      }
+      setDemoVideoUrls((current) => ({ ...current, ...urls }));
+    })();
     setOverview((current) =>
       current?.profile.role === "patient"
         ? { ...current, profile: { ...current.profile, ...restored.consent } }
@@ -243,18 +269,20 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       reps: reps.map(({ local_clip_url: _url, ...rep }) => rep),
       reviews,
       consent,
+      customs,
+      extraPlans,
     };
     try {
       localStorage.setItem(DEMO_KEY, JSON.stringify(state));
     } catch {
       /* Quota reached or storage blocked: keep the demo in memory. */
     }
-  }, [demo, demoReady, reps, reviews, consent]);
+  }, [demo, demoReady, reps, reviews, consent, customs, extraPlans]);
 
   async function clearDemo() {
     if (
       !window.confirm(
-        "Clear all demo reps, therapist feedback, privacy choices, and recorded demo clips from this browser?",
+        "Clear all demo reps, therapist feedback, privacy choices, custom exercises, and recorded demo clips from this browser?",
       )
     )
       return;
@@ -263,7 +291,14 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     } catch {
       /* Nothing stored. */
     }
-    await deleteLocalClips(reps.map((r) => r.id));
+    await deleteLocalClips([
+      ...reps.map((r) => r.id),
+      ...customs.map((c) => demoVideoKey(c.id)),
+    ]);
+    Object.values(demoVideoUrls).forEach((url) => URL.revokeObjectURL(url));
+    setCustoms([]);
+    setExtraPlans([]);
+    setDemoVideoUrls({});
     reps.forEach((r) => r.local_clip_url && URL.revokeObjectURL(r.local_clip_url));
     const fresh = { review_consent: false, training_consent: false };
     setReps([]);
@@ -278,6 +313,83 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
     setOverview({ profile: demoPatient, prescriptions: demoPlans });
     setError("");
     setNotice("Demo data cleared. You are starting fresh.");
+  }
+
+  // Poll while the worker trains a submitted exercise.
+  const training = customs.some((c) => c.status === "queued" || c.status === "training");
+  useEffect(() => {
+    if (demo || role !== "therapist" || !training) return;
+    const timer = setInterval(async () => {
+      try {
+        const rows: CustomExercise[] = await request("/exercises");
+        setCustoms(rows);
+      } catch {
+        /* Try again on the next tick. */
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [demo, role, training, request]);
+
+  async function submitExercise(form: ExerciseSubmission): Promise<boolean> {
+    let ok = false;
+    await guarded(async () => {
+      if (demo) {
+        // The demo has no worker, so it keeps the browser fit right away.
+        const id = crypto.randomUUID();
+        const segmenter = new RepSegmenter(form.preview.spec);
+        const sample = form.frames
+          .map((f) => segmenter.push(f))
+          .find((r): r is PoseFrame[] => r !== null);
+        await saveLocalClip(demoVideoKey(id), form.video);
+        setDemoVideoUrls((current) => ({
+          ...current,
+          [id]: URL.createObjectURL(form.video),
+        }));
+        setCustoms((current) => [
+          {
+            id,
+            therapist_id: demoTherapist.id,
+            name: form.name,
+            description: form.description,
+            steps: form.steps,
+            view: form.view,
+            status: "ready",
+            status_detail: null,
+            model: form.preview,
+            model_version: form.preview.version,
+            demo_video_path: null,
+            created_at: new Date().toISOString(),
+            sample_rep: sample ? trimLeadIn(form.preview.spec, sample) : undefined,
+          },
+          ...current,
+        ]);
+        setNotice(form.name + " is trained and ready to prescribe.");
+      } else {
+        const row: CustomExercise = await request("/exercises", "POST", {
+          name: form.name,
+          description: form.description,
+          steps: form.steps,
+          view: form.view,
+          demo_frames: form.frames,
+        });
+        setCustoms((current) => [row, ...current]);
+        try {
+          await apiFetch("/physio/exercises/" + row.id + "/video", token.current, {
+            method: "PUT",
+            headers: { "Content-Type": form.video.type },
+            body: form.video,
+          });
+        } catch (e) {
+          setError(
+            "The exercise is queued for training, but its demo video was not uploaded. " +
+              (e instanceof Error ? e.message : ""),
+          );
+        }
+        setNotice(form.name + " was sent to the trainer. It shows Ready when its model is built.");
+      }
+      ok = true;
+    });
+    return ok;
   }
 
   async function guarded(action: () => Promise<void>) {
@@ -324,7 +436,21 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
         },
       ]);
   }
+  async function demoVideoFor(customId: string) {
+    if (demo || demoVideoUrls[customId]) return;
+    try {
+      const { url } = await request("/exercises/" + customId + "/video");
+      setDemoVideoUrls((current) => ({ ...current, [customId]: url }));
+    } catch {
+      setNotice("The demo video is unavailable right now. The steps are still shown.");
+    }
+  }
   async function start(plan: Prescription) {
+    if (plan.exercise === "custom" && !movementFor("custom", info(plan).custom)) {
+      setError("This exercise's model is not ready yet. Ask your therapist, then refresh.");
+      return;
+    }
+    if (plan.custom_exercise_id) void demoVideoFor(plan.custom_exercise_id);
     await guarded(async () => {
       const data = demo
         ? [{ id: crypto.randomUUID() }]
@@ -358,6 +484,10 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           client_rep_id: crypto.randomUUID(),
           frames,
         });
+    // Link the rep to its custom exercise so lists can show its name.
+    rep.prescription ??= {
+      custom_exercise_id: session.plan.custom_exercise_id ?? null,
+    };
     if (video) {
       // Keep every rep's video on this device for the patient's own history.
       rep.local_clip_url = URL.createObjectURL(video);
@@ -635,7 +765,10 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 <button
                   type="button"
                   className="text-button"
-                  disabled={!!session || (!reps.length && !reviews.length)}
+                  disabled={
+                    !!session ||
+                    (!reps.length && !reviews.length && !customs.length)
+                  }
                   onClick={() => void clearDemo()}
                 >
                   Clear demo data
@@ -882,6 +1015,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   Set a daily target for a patient already assigned to you.
                 </p>
                 <PrescriptionForm
+                  customs={customs.filter((c) => c.status === "ready")}
                   patients={
                     demo
                       ? [
@@ -896,14 +1030,59 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   onSubmit={(body) =>
                     guarded(async () => {
                       if (!demo) await request("/prescriptions", "POST", body);
+                      else if (body.exercise === "custom")
+                        setExtraPlans((current) => [
+                          ...current,
+                          {
+                            ...(body as unknown as Prescription),
+                            id: crypto.randomUUID(),
+                            patient_id: demoPatient.id,
+                            instructions: String(body.instructions ?? ""),
+                          },
+                        ]);
                       setNotice(
                         demo
-                          ? "Demo prescription previewed. Sign in to save a real care plan."
+                          ? body.exercise === "custom"
+                            ? "Added to " + demoPatient.display_name + "'s plan. Switch to Patient to try it."
+                            : "Demo prescription previewed. Sign in to save a real care plan."
                           : "The prescription is ready in your patient’s plan.",
                       );
                     })
                   }
                 />
+              </div>
+              <div className="panel custom-panel">
+                <div className="section-heading">
+                  <div>
+                    <h2>Your exercises</h2>
+                    <p className="muted">
+                      Add a movement with a demo video. A model is trained from
+                      the demo&apos;s pose, then you can prescribe it.
+                    </p>
+                  </div>
+                </div>
+                {customs.length > 0 && (
+                  <ul className="custom-list">
+                    {customs.map((c) => (
+                      <li key={c.id}>
+                        <span className={"badge status-" + c.status}>
+                          {trainingStatusLabel(c.status)}
+                        </span>
+                        <div>
+                          <strong>{c.name}</strong>
+                          <small>
+                            {c.status === "failed"
+                              ? c.status_detail || "The demo could not be used. Record it again."
+                              : c.status === "ready" && c.model
+                                ? `${c.model.demoReps} demo reps · ${c.view === "front" ? "facing camera" : "side-on"} · ${c.model_version}`
+                                : "The trainer will pick this up shortly."}
+                          </small>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <CustomExerciseForm busy={busy} demo={demo} onSubmit={submitExercise} />
               </div>
             </>
           ) : page === "today" ? (
@@ -1001,6 +1180,13 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                                     : "Find a little more freedom in every comfortable reach.")}
                             </p>
                             <ExerciseSteps steps={info(plan).steps} />
+                            {plan.custom_exercise_id && (
+                              <DemoVideo
+                                url={demoVideoUrls[plan.custom_exercise_id]}
+                                onOpen={() => demoVideoFor(plan.custom_exercise_id!)}
+                                name={info(plan).name}
+                              />
+                            )}
                             <div className="exercise-progress">
                               <span>
                                 {count}{" "}
@@ -1568,14 +1754,49 @@ function MovementIllustration({
     </svg>
   );
 }
+function DemoVideo({
+  url,
+  onOpen,
+  name,
+}: {
+  url?: string;
+  onOpen: () => Promise<void>;
+  name: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="demo-video-inline">
+      <button
+        type="button"
+        className="text-button"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) void onOpen();
+        }}
+      >
+        {open ? "Hide demo video" : "▶ Watch your therapist's demo"}
+      </button>
+      {open &&
+        (url ? (
+          <video src={url} controls muted loop playsInline aria-label={"Demo of " + name} />
+        ) : (
+          <p className="muted">Loading the demo video…</p>
+        ))}
+    </div>
+  );
+}
+
 function PrescriptionForm({
   patients,
+  customs,
   busy,
   onSubmit,
 }: {
   patients: NonNullable<Overview["patients"]>;
+  customs: CustomExercise[];
   busy: boolean;
-  onSubmit: (body: object) => Promise<void>;
+  onSubmit: (body: Record<string, unknown>) => Promise<void>;
 }) {
   return (
     <form
@@ -1583,9 +1804,12 @@ function PrescriptionForm({
       onSubmit={(event) => {
         event.preventDefault();
         const d = new FormData(event.currentTarget);
+        const choice = String(d.get("exercise"));
+        const custom = choice.startsWith("custom:") ? choice.slice(7) : null;
         void onSubmit({
           patient_id: d.get("patient_id"),
-          exercise: d.get("exercise"),
+          exercise: custom ? "custom" : choice,
+          custom_exercise_id: custom,
           daily_target: Number(d.get("daily_target")),
           starts_on: d.get("starts_on"),
           ends_on: d.get("ends_on"),
@@ -1609,6 +1833,15 @@ function PrescriptionForm({
         <select name="exercise">
           <option value="squat">Bodyweight squat</option>
           <option value="shoulder_abduction">Shoulder abduction</option>
+          {customs.length > 0 && (
+            <optgroup label="Your exercises">
+              {customs.map((c) => (
+                <option value={"custom:" + c.id} key={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </label>
       <label>
