@@ -4,7 +4,7 @@ Run all of these from the repo root.
 
 | Script | What it does |
 |---|---|
-| `./scripts/dev.sh` | Installs dependencies if needed, then starts the API and the web app. Ctrl+C stops both. |
+| `./scripts/dev.sh` | Installs dependencies if needed, then starts the API and the web app. Ctrl+C stops both. Stops early, naming the process to kill, if port 8000 or 3000 is still held by an earlier run. |
 | `./scripts/worktree.sh <name>` | Makes `../<repo>-<name>` on branch `feat/<name>`. Copies `.env`, picks free ports, installs dependencies. |
 | `./scripts/worktree-remove.sh <name>` | Deletes that folder and its branch. Unmerged commits keep the branch. Uncommitted edits in the folder are lost. |
 | `./scripts/push-env [fly\|vercel] [url]` | Sends `.env` values to Fly and Vercel. The optional URL replaces the local `CORS_ORIGINS` (for `fly`) or `NEXT_PUBLIC_API_URL` (for `vercel`). |
