@@ -15,6 +15,21 @@ import {
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
 
+// MediaPipe's WASM runtime prints glog INFO lines (for example "INFO: Created
+// TensorFlow Lite XNNPACK delegate for CPU.") through console.error, which the
+// Next.js dev overlay reports as errors. Drop only those INFO lines.
+// ponytail: tasks-vision has no log-level option; remove this if it gains one.
+let mediapipeLogFilter = false;
+function filterMediapipeInfoLogs() {
+  if (mediapipeLogFilter) return;
+  mediapipeLogFilter = true;
+  const original = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && args[0].startsWith("INFO: ")) return;
+    original(...args);
+  };
+}
+
 // Turn browser camera and model-loading failures into steps a patient can act on.
 export function cameraErrorMessage(error: unknown): string {
   const name = error instanceof Error ? error.name : "";
@@ -234,6 +249,7 @@ export function LiveSession({
         return;
       }
       stream.current = media;
+      filterMediapipeInfoLogs();
       let pose: PoseLandmarker;
       try {
         const vision = await import("@mediapipe/tasks-vision");
