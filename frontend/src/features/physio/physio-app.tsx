@@ -1985,8 +1985,8 @@ function MovementIllustration({
         strokeDasharray="3 5"
       />
       <circle
-        cx={exercise === "squat" ? 135 : 120}
-        cy={exercise === "squat" ? 42 : 38}
+        cx={exercise === "squat" ? 137 : 120}
+        cy={exercise === "squat" ? 50 : 38}
         r="13"
         fill="#f0ae8c"
       />
@@ -2024,8 +2024,9 @@ function MovementIllustration({
         </>
       ) : exercise === "squat" ? (
         <>
+          {/* Side view, facing right: hips back, chest up, knee over the toes. */}
           <path
-            d="M130 61l-28 49 38 21-22 34"
+            d="M125 70 103 112l45 9-17 41"
             fill="none"
             stroke="#426255"
             strokeWidth="19"
@@ -2033,22 +2034,15 @@ function MovementIllustration({
             strokeLinejoin="round"
           />
           <path
-            d="M103 109l-31 20 17 36"
-            fill="none"
-            stroke="#6d8777"
-            strokeWidth="16"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M126 69l30 22 26-7"
+            d="M123 79l33 13 28-3"
             fill="none"
             stroke="#f0ae8c"
             strokeWidth="10"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
           <path
-            d="M83 168h21m6 0h25"
+            d="M122 168h29"
             stroke="#293d36"
             strokeWidth="8"
             strokeLinecap="round"
