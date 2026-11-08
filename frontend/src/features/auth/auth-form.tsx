@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { googleSignIn } from "./actions";
+import { Brand } from "@/features/ui/icons";
 
 type Props = {
   title: string;
@@ -18,11 +19,13 @@ export function AuthForm({
 }: Props) {
   return (
     <main className="auth-page panel">
-      <Link className="brand" href="/">
-        ⌁ physiotrace
-      </Link>
+      <Brand />
       <h1>{title}</h1>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       <form action={googleSignIn}>
         <button className="google-button" type="submit">
           <svg viewBox="0 0 18 18" aria-hidden="true" width="18" height="18">
@@ -72,7 +75,7 @@ export function AuthForm({
             required
           />
         </label>
-        <button className="primary">{title} →</button>
+        <button className="primary">{title}</button>
       </form>
       <p>
         <Link href={switchHref}>{switchText}</Link>
@@ -81,7 +84,7 @@ export function AuthForm({
         New accounts are patients. Therapist access is assigned by a care
         administrator.
       </p>
-      <Link href="/demo">Explore without an account ↗</Link>
+      <Link href="/demo">Explore without an account</Link>
     </main>
   );
 }

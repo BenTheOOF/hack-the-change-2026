@@ -2,6 +2,10 @@
 
 Next.js App Router, strict TypeScript, React, Supabase SSR authentication, and MediaPipe browser pose estimation. Pages remain thin; the patient and therapist features live in `src/features/physio/`.
 
+## Design
+
+Colours, type, spacing, radius and motion are CSS variables at the top of `src/app/globals.css`; `DESIGN.md` explains them. Icons and the logo come from `src/features/ui/icons.tsx`. Phones and tablets get a bottom tab bar, 960px and wider the sidebar.
+
 ## Run
 
 ```powershell

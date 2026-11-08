@@ -23,6 +23,7 @@ import { AdminConsole, type Account, type Assignment } from "./admin-console";
 import { ExerciseSteps } from "./exercise-steps";
 import { TrimmedVideo } from "./trimmed-video";
 import { LiveSession } from "./live-session";
+import { Brand, Icon, type IconName } from "@/features/ui/icons";
 import {
   customIdOf,
   exerciseInfo,
@@ -800,97 +801,85 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <Link href="/" className="brand">
-          <span className="brand-mark">
-            <svg viewBox="0 0 32 32">
-              <path d="M3 17h6l4-10 6 19 4-12h6" />
-            </svg>
-          </span>
-          <span>
-            physio<span className="brand-light">trace</span>
-            <small>SMALL MOVES. REAL PROGRESS.</small>
-          </span>
-        </Link>
+        <Brand />
         <span className="nav-label">
           {adminPage
-            ? "ADMINISTRATION"
+            ? "Administration"
             : role === "patient"
-              ? "YOUR RECOVERY"
-              : "YOUR PRACTICE"}
+              ? "Your recovery"
+              : "Your practice"}
         </span>
         <nav aria-label="Main navigation">
           {adminPage ? (
-            <button className="nav-item selected">
-              <span>⚙</span>Accounts &amp; roles
-            </button>
+            <NavItem icon="users" label="Accounts & roles" short="Accounts" selected />
           ) : (
             <>
-          <button
-            className={"nav-item " + (page === "today" ? "selected" : "")}
-            onClick={() => void openPage("today")}
-          >
-            <span>◫</span>
-            {role === "patient" ? "Today’s plan" : "Review queue"}
-            {role === "therapist" && queue.length > 0 && (
-              <span className="nav-number">{queue.length}</span>
-            )}
-          </button>
-          {role === "therapist" && (
-            <>
-              <button
-                className={"nav-item " + (page === "plans" ? "selected" : "")}
-                onClick={() => void openPage("plans")}
-              >
-                <span>☰</span>Patients &amp; plans
-              </button>
-              <button
-                className={"nav-item " + (page === "exercises" ? "selected" : "")}
-                onClick={() => void openPage("exercises")}
-              >
-                <span>✚</span>Add exercise
-                {training && <span className="nav-number">…</span>}
-              </button>
-            </>
-          )}
-          {role === "patient" && (
-            <>
-              <button
-                className={"nav-item " + (page === "history" ? "selected" : "")}
-                onClick={() => void openPage("history")}
-              >
-                <span>◷</span>Session history
-              </button>
-              <button
-                className={
-                  "nav-item " + (page === "feedback" ? "selected" : "")
-                }
-                onClick={() => void openPage("feedback")}
-              >
-                <span>☷</span>Therapist feedback
-                {reviews.length > 0 && (
-                  <span className="nav-number">{reviews.length}</span>
-                )}
-              </button>
-            </>
-          )}
-              <button
-                className={"nav-item " + (page === "assistant" ? "selected" : "")}
+              <NavItem
+                icon={role === "patient" ? "today" : "inbox"}
+                label={role === "patient" ? "Today’s plan" : "Review queue"}
+                short={role === "patient" ? "Today" : "Queue"}
+                selected={page === "today"}
+                count={role === "therapist" && queue.length > 0 ? queue.length : undefined}
+                onClick={() => void openPage("today")}
+              />
+              {role === "therapist" && (
+                <>
+                  <NavItem
+                    icon="users"
+                    label="Patients & plans"
+                    short="Patients"
+                    selected={page === "plans"}
+                    onClick={() => void openPage("plans")}
+                  />
+                  <NavItem
+                    icon="plus"
+                    label="Add exercise"
+                    short="Add"
+                    selected={page === "exercises"}
+                    count={training ? "…" : undefined}
+                    onClick={() => void openPage("exercises")}
+                  />
+                </>
+              )}
+              {role === "patient" && (
+                <>
+                  <NavItem
+                    icon="clock"
+                    label="Session history"
+                    short="History"
+                    selected={page === "history"}
+                    onClick={() => void openPage("history")}
+                  />
+                  <NavItem
+                    icon="message"
+                    label="Therapist feedback"
+                    short="Feedback"
+                    selected={page === "feedback"}
+                    count={reviews.length > 0 ? reviews.length : undefined}
+                    onClick={() => void openPage("feedback")}
+                  />
+                </>
+              )}
+              <NavItem
+                icon="help"
+                label="Ask PhysioTrace"
+                short="Ask"
+                selected={page === "assistant"}
                 onClick={() => void openPage("assistant")}
-              >
-                <span>?</span>Ask PhysioTrace
-              </button>
+              />
             </>
           )}
         </nav>
         <div className="sidebar-bottom">
           <div className="privacy-card">
-            <span>⌁</span>
+            <Icon name="shield" />
             <strong>Your space is private.</strong>
             <p>
               Movement is processed on your device. You choose what to share.
             </p>
             {role === "patient" && (
               <button
+                className="text-button"
                 onClick={() => {
                   setConsentOpen(true);
                   setConsentDraft({
@@ -899,7 +888,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   });
                 }}
               >
-                Privacy choices ↗
+                Privacy choices
               </button>
             )}
           </div>
@@ -930,7 +919,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             {!demo && (
               <form action="/logout" method="post">
                 <button className="text-button" aria-label="Log out">
-                  ↪
+                  <Icon name="logout" />
                 </button>
               </form>
             )}
@@ -963,7 +952,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             )}
             {demo && (
               <>
-                <span className="demo-badge">INTERACTIVE DEMO</span>
+                <span className="demo-badge">Interactive demo</span>
                 <div className="role-switch" aria-label="Demo role">
                   <button
                     disabled={!!session}
@@ -1038,7 +1027,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 >
                   Clear demo data
                 </button>
-                <Link href="/signup">Create your account ↗</Link>
+                <Link href="/signup">Create your account</Link>
               </span>
             </div>
           )}
@@ -1059,7 +1048,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 aria-label="Dismiss message"
                 onClick={() => setNotice("")}
               >
-                ×
+                <Icon name="x" />
               </button>
             </div>
           )}
@@ -1077,7 +1066,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               onRefresh={() => void loadAccounts()}
             />
           ) : loading && !profile ? (
-            <div className="empty-state">
+            <div className="empty-state" role="status" aria-busy="true">
               <h2>Opening your care plan…</h2>
             </div>
           ) : session ? (
@@ -1110,8 +1099,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">THE RIGHT PLAN FOR EACH PERSON</span>
-                  <h1>Patients &amp; plans.</h1>
+                  <span className="eyebrow">The right plan for each person</span>
+                  <h1>Patients &amp; plans</h1>
                   <p>See what each patient is working on and prescribe what comes next.</p>
                 </div>
               </div>
@@ -1203,8 +1192,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">MOVEMENTS MADE FOR YOUR PATIENTS</span>
-                  <h1>Add exercise.</h1>
+                  <span className="eyebrow">Movements made for your patients</span>
+                  <h1>Add exercise</h1>
                   <p>Add a movement from a demo video. Once its model is ready, prescribe it like any other exercise.</p>
                 </div>
               </div>
@@ -1245,9 +1234,9 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">
-                    A HUMAN EYE MAKES THE DIFFERENCE
+                    A human eye makes the difference
                   </span>
-                  <h1>Care, with a closer look.</h1>
+                  <h1>Care, with a closer look</h1>
                   <p>
                     Review uncertain movements and help your patients move
                     forward.
@@ -1260,7 +1249,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   }
                   disabled={loading}
                 >
-                  ↻ Refresh queue
+                  <Icon name="refresh" /> Refresh queue
                 </button>
               </div>
               <div className="stats-grid">
@@ -1308,7 +1297,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                         onClick={() => void inspect(rep)}
                       >
                         <span className="exercise-symbol">
-                          {rep.exercise === "squat" ? "↧" : "↟"}
+                          <Icon name={rep.exercise === "squat" ? "down" : "up"} />
                         </span>
                         <span>
                           <strong>
@@ -1326,7 +1315,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                         <span className="queue-time">
                           {rep.exercise_day}
                           <br />
-                          Review →
+                          Review
                         </span>
                       </button>
                     ))
@@ -1415,7 +1404,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                           className="primary"
                           disabled={busy || !feedback.trim()}
                         >
-                          Save review & send feedback →
+                          Save review & send feedback
                         </button>
                       </form>
                     </>
@@ -1435,7 +1424,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">A LITTLE BETTER, EVERY DAY</span>
+                  <span className="eyebrow">A little better, every day</span>
                   <h1>
                     Your pace. Your progress
                     <span className="accent-dot">.</span>
@@ -1453,7 +1442,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               <div className="stats-grid">
                 <Stat
                   label="Today’s accepted reps"
-                  value={String(accepted).padStart(2, "0")}
+                  value={String(accepted)}
                   suffix={"/ " + target}
                   detail={
                     target
@@ -1465,13 +1454,13 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 />
                 <Stat
                   label="Exercises in your plan"
-                  value={String(plans.length).padStart(2, "0")}
+                  value={String(plans.length)}
                   detail="Move at a comfortable pace"
                   color="cream"
                 />
                 <Stat
                   label="Waiting for a closer look"
-                  value={String(pending).padStart(2, "0")}
+                  value={String(pending)}
                   detail="Your therapist reviews uncertain reps"
                   color="peach"
                 />
@@ -1555,7 +1544,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                                 </span>
                                 <span>
                                   {done
-                                    ? "Daily target reached ✓"
+                                    ? "Daily target reached"
                                     : "Daily target"}
                                 </span>
                               </div>
@@ -1579,7 +1568,6 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                                 onClick={() => void start(plan)}
                               >
                                 {done ? "Practice again" : "Start exercise"}
-                                <span>↗</span>
                               </button>
                             </div>
                           </article>
@@ -1589,8 +1577,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 </section>
                 <aside>
                   <div className="panel note-panel">
-                    <span className="eyebrow">A NOTE FOR YOUR JOURNEY</span>
-                    <span className="note-flower">✳</span>
+                    <span className="eyebrow">A note for your journey</span>
                     <h2>
                       Progress doesn’t
                       <br />
@@ -1614,7 +1601,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                           className="text-button"
                           onClick={() => void openPage("feedback")}
                         >
-                          See all feedback →
+                          See all feedback
                         </button>
                       </>
                     ) : (
@@ -1627,7 +1614,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 </aside>
               </div>
               <div className="safety-inline">
-                <span>ⓘ</span>
+                <Icon name="info" />
                 <p>
                   <strong>Move with care.</strong> Stop if you feel pain.
                   PhysioTrace supports your therapist’s care and does not
@@ -1639,8 +1626,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">EVERY STEP FORWARD</span>
-                  <h1>Your movement history.</h1>
+                  <span className="eyebrow">Every step forward</span>
+                  <h1>Your movement history</h1>
                   <p>
                     Accepted reps, adjustments, and movements waiting for
                     review.
@@ -1684,8 +1671,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
             <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">CARE THAT STAYS CONNECTED</span>
-                  <h1>A little guidance goes a long way.</h1>
+                  <span className="eyebrow">Care that stays connected</span>
+                  <h1>A little guidance goes a long way</h1>
                   <p>Personal feedback from your physical therapist.</p>
                 </div>
               </div>
@@ -1733,7 +1720,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           )}
         </main>
         <footer className="app-footer">
-          <span>PHYSIOTRACE</span>
+          <span>PhysioTrace</span>
           <span>Made for the way you recover.</span>
           <span>Private by default</span>
         </footer>
@@ -1770,9 +1757,9 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               aria-label="Close privacy choices"
               onClick={() => setConsentOpen(false)}
             >
-              ×
+              <Icon name="x" />
             </button>
-            <span className="eyebrow">YOUR MOVEMENT. YOUR CHOICE.</span>
+            <span className="eyebrow">Your movement. Your choice.</span>
             <h2 id="consent-title">A little clarity on privacy.</h2>
             <p>
               Camera video stays on this device by default. Pose keypoints and
@@ -1824,7 +1811,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
               disabled={busy}
               onClick={() => void saveConsent()}
             >
-              Save my choices →
+              Save my choices
             </button>
             <p className="muted">New choices apply to your next session.</p>
           </section>
@@ -1878,10 +1865,39 @@ function Stat({
     </div>
   );
 }
+function NavItem({
+  icon,
+  label,
+  short,
+  selected = false,
+  count,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  short: string;
+  selected?: boolean;
+  count?: number | string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      className={"nav-item" + (selected ? " selected" : "")}
+      aria-current={selected ? "page" : undefined}
+      onClick={onClick}
+    >
+      <Icon name={icon} />
+      <span className="label-full">{label}</span>
+      <span className="label-short" aria-hidden="true">
+        {short}
+      </span>
+      {count !== undefined && <span className="nav-number">{count}</span>}
+    </button>
+  );
+}
 function Empty({ title, text }: { title: string; text: string }) {
   return (
     <div className="empty-state">
-      <span className="empty-flower">✳</span>
       <h3>{title}</h3>
       <p>{text}</p>
     </div>
@@ -1973,7 +1989,7 @@ function RepList({
         <div className="rep-item" key={rep.id}>
           <div className="rep-row">
             <span className="exercise-symbol">
-              {rep.exercise === "squat" ? "↧" : "↟"}
+              <Icon name={rep.exercise === "squat" ? "down" : "up"} />
             </span>
             <div>
               <strong>{exerciseInfo(rep, customs).name}</strong>
@@ -1996,11 +2012,14 @@ function RepList({
               aria-expanded={open === rep.id}
               onClick={() => void toggle(rep)}
             >
-              {open === rep.id
-                ? "Close"
-                : videoIds.has(rep.id)
-                  ? "▶ Watch video"
-                  : "▶ Pose replay"}
+              {open === rep.id ? (
+                "Close"
+              ) : (
+                <>
+                  <Icon name="play" size={16} />
+                  {videoIds.has(rep.id) ? "Watch video" : "Pose replay"}
+                </>
+              )}
             </button>
           </div>
           {open === rep.id && (
@@ -2173,7 +2192,13 @@ function DemoVideo({
           if (!open) void onOpen();
         }}
       >
-        {open ? "Hide demo video" : "▶ Watch your therapist's demo"}
+        {open ? (
+          "Hide demo video"
+        ) : (
+          <>
+            <Icon name="play" size={16} /> Watch your therapist&apos;s demo
+          </>
+        )}
       </button>
       {open &&
         (url ? (
@@ -2310,11 +2335,11 @@ function PrescriptionForm({
       </label>
       <div className="form-actions">
         <button className="primary" disabled={busy || !patients.length}>
-          {busy ? "Saving…" : "Save prescription →"}
+          {busy ? "Saving…" : "Save prescription"}
         </button>
         {saved && (
           <p className="form-success" role="status">
-            ✓ {saved}
+            <Icon name="check" size={18} /> {saved}
           </p>
         )}
       </div>

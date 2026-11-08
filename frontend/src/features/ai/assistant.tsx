@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Icon } from "@/features/ui/icons";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -19,10 +20,10 @@ const COPY: Record<
   }
 > = {
   patient: {
-    eyebrow: "QUESTIONS, ANSWERED KINDLY",
+    eyebrow: "Questions, answered kindly",
     lead: "General help with technique, setup, and using the app. Your therapist knows your recovery best.",
     notice:
-      "ⓘ General guidance, not medical advice. It does not see your plan or your camera. Stop if you feel pain and ask your therapist.",
+      "General guidance, not medical advice. It does not see your plan or your camera. Stop if you feel pain and ask your therapist.",
     suggestions: [
       "How do I keep my knees comfortable in a squat?",
       "What should I do if a rep hurts?",
@@ -31,10 +32,10 @@ const COPY: Record<
     placeholder: "Ask about technique, setup, or the app…",
   },
   therapist: {
-    eyebrow: "FOR YOUR PRACTICE",
+    eyebrow: "For your practice",
     lead: "Help with the review queue, prescriptions, custom exercises, and coaching cues. Your clinical judgement comes first.",
     notice:
-      "ⓘ General information, not clinical advice. It does not see your patients, their clips, or their plans. Leave out names and other identifying details.",
+      "General information, not clinical advice. It does not see your patients, their clips, or their plans. Leave out names and other identifying details.",
     suggestions: [
       "How should I label a rep that is borderline?",
       "What makes a good demo video for a custom exercise?",
@@ -105,12 +106,13 @@ export function Assistant({
       <div className="page-heading">
         <div>
           <span className="eyebrow">{copy.eyebrow}</span>
-          <h1>Ask PhysioTrace.</h1>
+          <h1>Ask PhysioTrace</h1>
           <p>{copy.lead}</p>
         </div>
       </div>
       <div className="panel assistant-panel">
         <p className="assistant-notice" role="note">
+          <Icon name="info" size={18} />
           {copy.notice}
         </p>
         {demo ? (
@@ -184,7 +186,7 @@ export function Assistant({
                 placeholder={copy.placeholder}
               />
               <button className="primary" disabled={sending || !draft.trim()}>
-                {sending ? "Sending…" : "Send →"}
+                {sending ? "Sending…" : "Send"}
               </button>
             </form>
             <p className="muted assistant-limit">

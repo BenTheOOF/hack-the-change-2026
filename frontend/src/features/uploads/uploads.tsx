@@ -36,15 +36,24 @@ export function Uploads({ userId }: { userId: string }) {
 
   return (
     <section>
-      <form action={upload}>
-        <input name="file" type="file" required />
-        <button>Upload</button>
+      <form action={upload} className="uploads-form">
+        <label className="sr-only" htmlFor="upload-file">
+          File to upload
+        </label>
+        <input id="upload-file" name="file" type="file" required />
+        <button className="primary">Upload</button>
       </form>
-      {error && <p role="alert">{error}</p>}
-      <ul>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <ul className="uploads-list">
         {files.map((name) => (
           <li key={name}>
-            <button onClick={() => open(name)}>{name}</button>
+            <button className="text-button" onClick={() => open(name)}>
+              {name}
+            </button>
           </li>
         ))}
       </ul>

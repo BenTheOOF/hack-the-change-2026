@@ -1,46 +1,67 @@
 import Link from "next/link";
+import { Brand, Icon } from "@/features/ui/icons";
 
 export function Landing() {
   return (
     <div className="landing">
       <header>
-        <Link className="brand" href="/">
-          <span className="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32">
-              <path d="M3 17h6l4-10 6 19 4-12h6" />
-            </svg>
-          </span>
-          <span>
-            physio<span className="brand-light">trace</span>
-          </span>
-        </Link>
-        <div>
+        <Brand />
+        <nav aria-label="Account">
           <Link href="/login">Sign in</Link>
           <Link className="primary" href="/signup">
-            Get started ↗
+            Get started
           </Link>
-        </div>
+        </nav>
       </header>
-      <main>
-        <span className="eyebrow">SMALL MOVES. REAL PROGRESS.</span>
-        <h1>
-          Recovery, at
-          <br />
-          <em>your pace.</em>
-        </h1>
-        <p>
-          A little guidance for every repetition. Practice your prescribed
-          exercises with private, on-device movement feedback and your physical
-          therapist close by.
-        </p>
-        <div className="landing-actions">
-          <Link className="primary" href="/demo">
-            Explore the demo ↗
-          </Link>
-          <Link className="secondary" href="/login">
-            Open my care plan
-          </Link>
+      <main className="landing-hero">
+        <div className="landing-copy">
+          <span className="eyebrow">Small moves. Real progress.</span>
+          <h1>
+            Recovery, at
+            <br />
+            <em>your pace.</em>
+          </h1>
+          <p>
+            A little guidance for every repetition. Practice your prescribed
+            exercises with private, on-device movement feedback and your
+            physical therapist close by.
+          </p>
+          <div className="landing-actions">
+            <Link className="primary" href="/demo">
+              Explore the demo
+            </Link>
+            <Link className="secondary" href="/login">
+              Open my care plan
+            </Link>
+          </div>
         </div>
+        {/* A still of the live session: camera, tracked pose, and the rep result. */}
+        <figure className="landing-figure" aria-hidden="true">
+          <div className="camera-stage">
+            <svg className="landing-skeleton" viewBox="0 0 400 300">
+              <circle className="head" cx="214" cy="66" r="15" />
+              <path d="M206 96 168 168l58 18-10 58 26 2M206 96l40 18 40-4" />
+              <circle cx="206" cy="96" r="6" />
+              <circle cx="168" cy="168" r="6" />
+              <circle cx="226" cy="186" r="6" />
+              <circle cx="216" cy="244" r="6" />
+              <circle cx="246" cy="114" r="6" />
+              <circle cx="286" cy="110" r="6" />
+            </svg>
+            <span className="camera-chip">
+              <span className="status-dot" /> On-device pose tracking
+            </span>
+          </div>
+          <div className="feedback-banner tone-correct">
+            <span className="feedback-icon">
+              <Icon name="check" />
+            </span>
+            <div>
+              <strong>Rep counted. Keep your pace.</strong>
+              <p>7 of 10 reps today</p>
+            </div>
+          </div>
+        </figure>
         <div className="landing-details">
           <span>
             01 <strong>Move comfortably.</strong>
@@ -61,13 +82,6 @@ export function Landing() {
           prototype, not a clinical assessment.
         </p>
       </main>
-      <div className="landing-orbit" aria-hidden="true">
-        <div className="orbit-ring" />
-        <span className="orbit-flower">✳</span>
-        <div className="orbit-note">
-          <span className="status-dot" /> One comfortable rep at a time.
-        </div>
-      </div>
     </div>
   );
 }

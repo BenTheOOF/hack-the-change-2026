@@ -5,6 +5,7 @@ import type { PoseFrame } from "./engine";
 import { extractDemoPose, MAX_SOURCE_SECONDS, readDuration } from "./extract-pose";
 import { fitTemplate, type TemplateModel } from "./template";
 import { TrimmedVideo } from "./trimmed-video";
+import { Icon } from "@/features/ui/icons";
 import { clampTrim, formatTime, MAX_DEMO_SECONDS, type Trim } from "./trim";
 
 export type ExerciseSubmission = {
@@ -268,11 +269,11 @@ export function CustomExerciseForm({
             <div className="record-actions">
               {recording ? (
                 <button type="button" className="primary" onClick={() => recorder.current?.stop()}>
-                  ■ Stop recording ({seconds}s)
+                  Stop recording ({seconds}s)
                 </button>
               ) : (
                 <button type="button" className="primary" onClick={startRecording}>
-                  ● Start recording
+                  Start recording
                 </button>
               )}
               {!recording && (
@@ -390,7 +391,7 @@ export function CustomExerciseForm({
         )}
         {preview && (
           <p className="fit-preview" role="status">
-            ✓ Found {preview.demoReps} reps. Main joint:{" "}
+            <Icon name="check" size={18} /> Found {preview.demoReps} reps. Main joint:{" "}
             {jointName(preview)}. {demo ? "Ready to save." : "The trainer will build the model after you save."}
           </p>
         )}
@@ -401,7 +402,7 @@ export function CustomExerciseForm({
         )}
       </div>
       <button className="primary custom-submit" disabled={busy || !ready}>
-        {demo ? "Save and train exercise →" : "Save and send for training →"}
+        {demo ? "Save and train exercise" : "Save and send for training"}
       </button>
     </form>
   );
