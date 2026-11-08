@@ -24,7 +24,16 @@ test("keeps http for local development", () => {
   assert.equal(siteOrigin(h({ host: "localhost:3000" })), "http://localhost:3000");
 });
 
-test("SITE_URL wins and loses its trailing slash", () => {
+test("the browser's Origin wins, so the code verifier cookie is on that host", () => {
+  process.env.SITE_URL = "https://example.com";
+  assert.equal(
+    siteOrigin(h({ origin: "https://www.example.com", host: "127.0.0.1:3000" })),
+    "https://www.example.com",
+  );
+  delete process.env.SITE_URL;
+});
+
+test("SITE_URL beats the Host header and loses its trailing slash", () => {
   process.env.SITE_URL = "https://physio.example.org/";
   assert.equal(siteOrigin(h({ host: "127.0.0.1:3000" })), "https://physio.example.org");
   delete process.env.SITE_URL;

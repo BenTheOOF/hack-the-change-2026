@@ -1,11 +1,14 @@
-// The address people use to reach the app, for auth redirects.
+// The public address the browser is on, for the Google sign-in return URL.
 //
-// Behind a reverse proxy, `request.url` in a route handler names the address
-// Next.js listens on (for example https://localhost:3000), not the public
-// domain, so redirects built from it send people to localhost. SITE_URL in the
-// root .env wins; otherwise the proxy's Host and X-Forwarded-Proto headers are
-// used, which Caddy and most proxies pass through.
+// Supabase sends the person back to this address, and the PKCE code verifier
+// cookie only exists on the host where they clicked "Continue with Google", so
+// the browser's own Origin header (always sent with a server action) comes
+// first. SITE_URL in the root .env is a fallback for requests without one; the
+// proxy's Host and X-Forwarded-Proto headers come last. `request.url` is never
+// used: behind a proxy it names the internal address (localhost:3000).
 export function siteOrigin(head: Headers): string {
+  const origin = head.get("origin");
+  if (origin && origin !== "null") return origin;
   const configured = process.env.SITE_URL?.trim().replace(/\/+$/, "");
   if (configured) return configured;
   const host = head.get("host") ?? "localhost:3000";
