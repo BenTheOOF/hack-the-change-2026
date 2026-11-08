@@ -136,4 +136,6 @@ node scripts/check-care-db.mjs .tools/verification/node_modules/@electric-sql/pg
 
 These checks execute the migration and test RLS, role protection, retry idempotency, review correction, and consent revocation. They never connect to Supabase or train a model.
 
+Deploying to your own server and domain (AWS or Vultr) is covered step by step in `docs/deployment.md`.
+
 See `docs/architecture.md` for the approved proposal, `docs/decisions.md` for implementation choices, and `docs/verification.md` for the checks and remaining environment limits.
