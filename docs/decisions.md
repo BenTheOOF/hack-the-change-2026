@@ -10,7 +10,7 @@ The API router discovery already in `app/main.py` loads the new feature routes. 
 
 ## 2026-11-07: consent and review semantics
 
-Pose sequences and results are care records. Video stays in a bounded browser memory buffer unless an uncertain repetition is uploaded with review consent. Recording is video-only, capped at 10 MiB per rep. A recording starts when movement is detected, so it can omit up to 300 ms of preparation. Pose-only replay remains available.
+Pose sequences and results are care records. Video stays in a bounded browser memory buffer unless an uncertain repetition is uploaded with review consent. Recording is video-only, capped at 10 MiB per rep. A recording started when movement was detected, so it missed the start of the rep (superseded below). Pose-only replay remains available.
 
 Review-upload consent and future-training consent are separate and default off. A session snapshots consent. Upload checks the current consent again after storage completes; a concurrent revocation rejects attachment and removes that new upload. Revoking review consent hides prior clips; an already issued signed URL expires within 60 seconds. Revoking training consent removes dataset memberships and opts prior reps out permanently. A later opt-in applies only to newly recorded eligible reps.
 
@@ -51,3 +51,9 @@ The therapist review plays the real video first, with a toggle for the skeleton 
 ## 2026-11-07: demo data survives refreshes
 
 The demo's reps, therapist reviews, and privacy choices are saved in the browser's localStorage under `physiotrace-demo-v1`, and demo clips use the same on-device clip store as real sessions. Nothing is sent to the server. A "Clear demo data" button in the demo banner, behind a confirmation, removes the saved state and the demo clips. Saving waits until the restore has rendered, so React's development double effects cannot overwrite saved data with the empty starting state. If storage is blocked or full, the demo keeps working in memory.
+
+## 2026-11-07: rep clips start before the movement
+
+Clips used to start when the segmenter detected movement, about 30 degrees into a squat, plus encoder start-up time, and stopped the instant the patient was back at rest. While tracking waits at rest, the session now keeps two staggered recordings and restarts the older one every 3 s; when movement starts it keeps the older one, so each clip has 1.5 to 3 s of lead-in. Recording continues for 0.5 s after the return to rest.
+
+The segmenter keeps up to 3 s of resting pose before a rep, and the saved pose sequence is trimmed to start where the video starts so the skeleton overlay lines up with it. Both classifiers first drop lead-in frames beyond the two resting frames before movement, which is what the segmenter always supplied, so the lead-in never changes duration, tempo, or labels. The 15 s abort now counts from movement start. Sequences stay within the 180-frame and 20 s limits.

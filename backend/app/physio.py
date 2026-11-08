@@ -12,6 +12,7 @@ MODEL_VERSION = "rules-1.1.0"
 SQUAT_REST, SQUAT_MOVE, SQUAT_DEPTH = 155, 145, (50, 130)
 SHOULDER_REST, SHOULDER_MOVE, SHOULDER_PEAK, SHOULDER_ASYMMETRY = 35, 40, (70, 130), 35
 MIN_TEMPO_MS, MAX_GAP_MS = 1000, 700
+VISIBLE = 0.5
 
 
 def tracking_confidence(visibility: float) -> float:
@@ -61,7 +62,18 @@ def measurements(exercise: Exercise, points: list[Point], aspect: float = 1) -> 
     return mean(values), min(quality), abs(values[0] - values[1])
 
 
+def trim_lead_in(exercise: Exercise, frames: list[PoseFrame]) -> list[PoseFrame]:
+    """Classify from two resting frames before movement, so a longer replay lead-in changes nothing."""
+    for i, frame in enumerate(frames):
+        value, quality, _ = measurements(exercise, frame.points, frame.aspect_ratio)
+        moving = value < SQUAT_MOVE if exercise == "squat" else value > SHOULDER_MOVE
+        if quality >= VISIBLE and moving:
+            return frames[i - 2:] if i > 2 else frames
+    return frames
+
+
 def classify(exercise: Exercise, frames: list[PoseFrame], threshold: float = 0.8) -> Evaluation:
+    frames = trim_lead_in(exercise, frames)
     def result(label: str, error: str | None, confidence: float, feedback: str) -> Evaluation:
         return Evaluation(label=label, error_type=error, confidence=round(confidence, 3), feedback=feedback)
 

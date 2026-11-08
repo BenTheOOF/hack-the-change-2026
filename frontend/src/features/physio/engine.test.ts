@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  alignLeadIn,
   autoStart,
   demoFrame,
   jointAngle,
@@ -98,4 +99,38 @@ test("tracking starts only after every check holds 2 s and the replay pause ends
   state = autoStart(state.readySince, true, 3000, 4500);
   assert.equal(state.start, false);
   assert.equal(autoStart(state.readySince, true, 4500, 4500).start, true);
+});
+
+test("a replay lead-in is kept but never changes the classification", () => {
+  const rest = Array(20).fill(175);
+  const rep = [175, 165, 140, 110, 95, 110, 140, 165, 175, 175];
+  const segmenter = new RepSegmenter("squat");
+  const out = sequence("squat", [...rest, ...rep])
+    .map((f) => segmenter.push(f))
+    .filter((f) => f !== null);
+  assert.equal(out.length, 1);
+  // 20 resting frames at 250 ms: up to 3 s (13 frames) of lead-in is kept.
+  assert.ok(out[0]!.length >= rep.length + 10);
+  assert.equal(out[0]![0].t, 0);
+  const short = sequence("squat", rep);
+  const long = out[0]!;
+  const a = ruleClassifier.classify("squat", short, 0.8);
+  const b = ruleClassifier.classify("squat", long, 0.8);
+  assert.equal(b.label, a.label);
+  assert.equal(b.error_type, a.error_type);
+  // Too-fast reps stay too fast however long the lead-in is.
+  const fast = [...Array(12).fill(175), 175, 150, 110, 150, 175, 175].map(
+    (a, i) => demoFrame("squat", a, i * 120),
+  );
+  assert.equal(ruleClassifier.classify("squat", fast, 0.8).error_type, "tempo");
+});
+
+test("aligning to the video drops early lead-in but keeps the movement", () => {
+  const frames = sequence("squat", [175, 175, 175, 175, 175, 140, 100, 140, 175, 175]);
+  const aligned = alignLeadIn("squat", frames, 600);
+  assert.equal(aligned[0].t, 0);
+  assert.equal(aligned.length, frames.length - 3); // frames at 0, 250, 500 ms dropped
+  // A late video start can never cut into the two resting frames before movement.
+  assert.equal(alignLeadIn("squat", frames, 5000).length, frames.length - 3);
+  assert.equal(alignLeadIn("squat", frames, -200), frames);
 });

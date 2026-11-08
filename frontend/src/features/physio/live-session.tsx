@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import {
+  alignLeadIn,
   autoStart,
   demoFrame,
   drawSkeleton,
@@ -10,6 +11,7 @@ import {
   measure,
   RepSegmenter,
   ruleClassifier,
+  RULES,
   type Evaluation,
   type PoseFrame,
 } from "./engine";
@@ -49,6 +51,15 @@ export function cameraErrorMessage(error: unknown): string {
 }
 
 const READY_HOLD_MS = 2000;
+const LEAD_IN_MAX_MS = RULES.leadInMs;
+const POST_ROLL_MS = 500;
+
+type Take = {
+  rec: MediaRecorder;
+  started: number;
+  chunks: Blob[];
+  done?: (blob?: Blob) => void;
+};
 const REPLAY_PAUSE_MS = 3000;
 
 type Props = {
@@ -76,9 +87,8 @@ export function LiveSession({
     canvas = useRef<HTMLCanvasElement>(null);
   const stream = useRef<MediaStream | null>(null),
     detector = useRef<PoseLandmarker | null>(null);
-  const recorder = useRef<MediaRecorder | null>(null),
-    chunks = useRef<Blob[]>([]);
-  const finishRecording = useRef<((blob?: Blob) => void) | null>(null);
+  const takes = useRef<Take[]>([]),
+    recordingUnsupported = useRef(false);
   const animation = useRef(0),
     generation = useRef(0),
     mounted = useRef(true),
@@ -125,65 +135,98 @@ export function LiveSession({
       });
   }, [last, lastLabel]);
 
-  const stopRecording = (): Promise<Blob | undefined> => {
-    if (!recorder.current || recorder.current.state === "inactive")
-      return Promise.resolve(undefined);
-    return new Promise((resolve) => {
-      finishRecording.current = resolve;
-      recorder.current!.stop();
-    });
+  const discardTake = (take: Take) => {
+    take.rec.ondataavailable = null;
+    take.rec.onstop = null;
+    if (take.rec.state !== "inactive") take.rec.stop();
+  };
+  const discardTakes = () => {
+    takes.current.forEach(discardTake);
+    takes.current = [];
   };
 
-  const startRecording = () => {
-    if (
-      !stream.current ||
-      !window.MediaRecorder ||
-      recorder.current?.state === "recording"
-    )
-      return;
-    const mimeType = ["video/webm;codecs=vp8", "video/webm", "video/mp4"].find(
+  const newTake = (): Take | null => {
+    if (!stream.current || !window.MediaRecorder) return null;
+    const mime = ["video/webm;codecs=vp8", "video/webm", "video/mp4"].find(
       (m) => MediaRecorder.isTypeSupported(m),
     );
-    if (!mimeType) return;
-    // ponytail: recording starts at detected movement, with at most 300ms of setup omitted.
-    // A future encoded-frame ring buffer can preserve exact pre-roll without storing a whole session.
+    if (!mime) return null;
     try {
-      const record = new MediaRecorder(stream.current, {
-        mimeType,
+      const rec = new MediaRecorder(stream.current, {
+        mimeType: mime,
         videoBitsPerSecond: 700000,
       });
-      chunks.current = [];
+      const take: Take = { rec, started: performance.now(), chunks: [] };
       let size = 0;
-      record.ondataavailable = (event) => {
+      rec.ondataavailable = (event) => {
         size += event.data.size;
-        if (size <= 10 * 1024 * 1024) chunks.current.push(event.data);
-        else {
-          chunks.current = [];
-          if (record.state === "recording") record.stop();
-        }
+        if (size <= 10 * 1024 * 1024) take.chunks.push(event.data);
+        else take.chunks = [];
       };
-      record.onstop = () => {
-        const blob = chunks.current.length
-          ? new Blob(chunks.current, { type: mimeType })
-          : undefined;
-        chunks.current = [];
-        finishRecording.current?.(blob);
-        finishRecording.current = null;
-      };
-      recorder.current = record;
-      record.start(250);
+      rec.onstop = () =>
+        take.done?.(
+          take.chunks.length
+            ? new Blob(take.chunks, { type: mime })
+            : undefined,
+        );
+      rec.start(250);
+      return take;
     } catch {
-      /* Pose-only replay still works on browsers without a usable video encoder. */
+      return null;
     }
   };
 
-  const evaluate = async (frames: PoseFrame[]) => {
+  // While the patient waits at rest, keep two staggered recordings. The older
+  // one is kept when movement starts, so every clip has 1.5-3 s of lead-in.
+  const rollTakes = (now: number) => {
+    if (recordingUnsupported.current) return;
+    const list = takes.current;
+    if (list.length && now - list[0].started >= LEAD_IN_MAX_MS)
+      discardTake(list.shift()!);
+    const newest = list.at(-1);
+    if (
+      !newest ||
+      (list.length < 2 && now - newest.started >= LEAD_IN_MAX_MS / 2)
+    ) {
+      const take = newTake();
+      if (take) list.push(take);
+      else recordingUnsupported.current = true;
+    }
+  };
+
+  const keepOldestTake = () => {
+    takes.current.slice(1).forEach(discardTake);
+    takes.current = takes.current.slice(0, 1);
+  };
+
+  // Keep recording briefly after the return to rest, then hand back the clip.
+  const finishTake = async (): Promise<
+    { blob?: Blob; started: number } | undefined
+  > => {
+    keepOldestTake();
+    const take = takes.current.pop();
+    if (!take) return undefined;
+    await new Promise((resolve) => setTimeout(resolve, POST_ROLL_MS));
+    return new Promise((resolve) => {
+      take.done = (blob) => resolve({ blob, started: take.started });
+      if (take.rec.state === "inactive") resolve({ started: take.started });
+      else take.rec.stop();
+    });
+  };
+
+  const evaluate = async (segment: PoseFrame[]) => {
     if (evaluating.current) return;
     evaluating.current = true;
     running.current = false;
     setActive(false);
+    const segmentStart = segmenter.current.lastStart;
     try {
-      const clip = await stopRecording();
+      const take = await finishTake();
+      const clip = take?.blob;
+      // Start the saved pose where the video starts, so the overlay lines up.
+      const frames = clip
+        ? alignLeadIn(plan.exercise, segment, take.started - segmentStart)
+        : segment;
       const local = ruleClassifier.classify(
         plan.exercise,
         frames,
@@ -231,7 +274,7 @@ export function LiveSession({
     stream.current = null;
     detector.current?.close();
     detector.current = null;
-    if (recorder.current?.state === "recording") recorder.current.stop();
+    discardTakes();
     segmenter.current.reset();
     readySince.current = 0;
   };
@@ -410,6 +453,7 @@ export function LiveSession({
                 }
               }
               if (running.current) {
+                if (!segmenter.current.active) rollTakes(now);
                 // Poor tracking during an active rep must reach the classifier as uncertainty.
                 const wasActive = segmenter.current.active;
                 const frames = segmenter.current.push({
@@ -418,9 +462,9 @@ export function LiveSession({
                   aspect_ratio:
                     video.current.videoWidth / video.current.videoHeight,
                 });
-                if (!wasActive && segmenter.current.active) startRecording();
+                if (!wasActive && segmenter.current.active) keepOldestTake();
                 if (wasActive && !segmenter.current.active && !frames)
-                  void stopRecording();
+                  discardTakes();
                 if (frames) void evaluate(frames);
               }
             } else {
@@ -429,7 +473,7 @@ export function LiveSession({
               setChecks({ body: false, distance: false, light: false });
               // Do not join movements on either side of a complete tracking loss.
               segmenter.current.reset();
-              void stopRecording();
+              discardTakes();
             }
           } catch {
             setError(
@@ -581,7 +625,7 @@ export function LiveSession({
                 running.current = false;
                 setActive(false);
                 segmenter.current.reset();
-                void stopRecording();
+                discardTakes();
               }}
             >
               Pause

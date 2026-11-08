@@ -25,7 +25,26 @@ export const RULES = {
   shoulder: { rest: 35, move: 40, peakMin: 70, peakMax: 130, asymmetry: 35 },
   minTempoMs: 1000,
   maxGapMs: 700,
+  // Resting pose kept before a rep so its replay shows the whole movement.
+  leadInMs: 3000,
 } as const;
+
+const isMoving = (exercise: Exercise, frame: PoseFrame) => {
+  const { angle, quality } = measure(exercise, frame.points, frame.aspect_ratio);
+  return (
+    quality >= RULES.visible &&
+    (exercise === "squat"
+      ? angle < RULES.squat.move
+      : angle > RULES.shoulder.move)
+  );
+};
+
+// Classify from two resting frames before movement, as the segmenter always
+// did. A longer replay lead-in therefore never changes tempo or duration checks.
+export function trimLeadIn(exercise: Exercise, frames: PoseFrame[]) {
+  const first = frames.findIndex((f) => isMoving(exercise, f));
+  return first > 2 ? frames.slice(first - 2) : frames;
+}
 
 // Map mean joint visibility to a tracking confidence: 0.7+ is fully trusted,
 // 0.62 reaches the default 0.8 threshold, 0.5 stays uncertain.
@@ -102,8 +121,25 @@ export function measure(exercise: Exercise, points: Point[], aspect = 1) {
       };
 }
 
+// Drop lead-in frames recorded before the video started (cutMs, relative to
+// the first frame), keeping at least the two resting frames before movement.
+export function alignLeadIn(
+  exercise: Exercise,
+  frames: PoseFrame[],
+  cutMs: number,
+): PoseFrame[] {
+  const first = frames.findIndex((f) => isMoving(exercise, f));
+  const limit = first > 2 ? first - 2 : 0;
+  let start = 0;
+  while (start < limit && frames[start].t < cutMs) start++;
+  if (!start) return frames;
+  const t0 = frames[start].t;
+  return frames.slice(start).map((f) => ({ ...f, t: f.t - t0 }));
+}
+
 export const ruleClassifier: RepClassifier = {
-  classify(exercise, frames, threshold = 0.8) {
+  classify(exercise, allFrames, threshold = 0.8) {
+    const frames = trimLeadIn(exercise, allFrames);
     const result = (
       label: Evaluation["label"],
       error_type: string | null,
@@ -219,7 +255,10 @@ export class RepSegmenter {
   private frames: PoseFrame[] = [];
   private ready: PoseFrame[] = [];
   private restingFrames = 0;
+  private moveStart = 0;
   private exercise: Exercise;
+  /** Original timestamp of the first frame of the last completed rep. */
+  lastStart = 0;
   constructor(exercise: Exercise) {
     this.exercise = exercise;
   }
@@ -245,9 +284,13 @@ export class RepSegmenter {
       this.exercise === "squat" ? angle < squat.move : angle > shoulder.move;
     if (!this.frames.length) {
       if (quality >= visible && resting) {
-        this.ready = [...this.ready.slice(-2), frame];
+        this.ready = [
+          ...this.ready.filter((f) => frame.t - f.t <= RULES.leadInMs),
+          frame,
+        ].slice(-30);
       } else if (quality >= visible && moving && this.ready.length >= 2) {
         this.frames = [...this.ready, frame];
+        this.moveStart = frame.t;
         this.ready = [];
       } else if (quality < visible) {
         this.ready = [];
@@ -257,12 +300,13 @@ export class RepSegmenter {
     this.frames.push(frame);
     this.restingFrames =
       resting && quality >= visible ? this.restingFrames + 1 : 0;
-    if (this.frames.length > 180 || frame.t - this.frames[0].t > 15000) {
+    if (this.frames.length > 180 || frame.t - this.moveStart > 15000) {
       this.reset();
       return null;
     }
     if (this.restingFrames >= 2) {
       const start = this.frames[0].t;
+      this.lastStart = start;
       const complete = this.frames.map((f) => ({ ...f, t: f.t - start }));
       this.reset();
       this.ready = [frame];
