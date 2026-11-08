@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   alignLeadIn,
+  movementProgress,
   autoStart,
   demoFrame,
   jointAngle,
@@ -133,4 +134,24 @@ test("aligning to the video drops early lead-in but keeps the movement", () => {
   // A late video start can never cut into the two resting frames before movement.
   assert.equal(alignLeadIn("squat", frames, 5000).length, frames.length - 3);
   assert.equal(alignLeadIn("squat", frames, -200), frames);
+});
+
+test("the movement gauge matches the classifier's counting range", () => {
+  const zone = (e: "squat" | "shoulder_abduction", a: number) =>
+    movementProgress(e, a).zone;
+  assert.equal(zone("squat", 175), "rest");
+  assert.equal(zone("squat", 145), "approach");
+  assert.equal(zone("squat", 130), "target");
+  assert.equal(zone("squat", 90), "target");
+  assert.equal(zone("squat", 50), "target");
+  assert.equal(zone("squat", 45), "over");
+  assert.equal(zone("shoulder_abduction", 20), "rest");
+  assert.equal(zone("shoulder_abduction", 55), "approach");
+  assert.equal(zone("shoulder_abduction", 90), "target");
+  assert.equal(zone("shoulder_abduction", 140), "over");
+  const squat = movementProgress("squat", 130);
+  assert.equal(squat.position, squat.bandStart);
+  assert.ok(squat.bandStart < squat.bandEnd);
+  assert.equal(movementProgress("squat", 180).position, 0);
+  assert.equal(movementProgress("squat", 20).position, 1);
 });

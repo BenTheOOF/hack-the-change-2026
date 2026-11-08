@@ -97,4 +97,5 @@ without changes elsewhere.
 - Phase 6 (2026-11-07): therapist review plays the real rep video (skeleton overlay toggle) when the patient shares clips; patients rewatch every rep's video in history from on-device IndexedDB storage; auto-start hold is 2 s with a countdown.
 - Demo data persists in this browser across refreshes (localStorage plus on-device clips) until "Clear demo data" is used.
 - Rep clips include 1.5 to 3 s of lead-in and 0.5 s after the rep; the saved pose is aligned to the video and classification ignores the extra lead-in.
+- Live session has a movement gauge beside the camera (target band from the classifier rules, peak marker, cue).
 - Training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

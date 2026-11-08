@@ -1937,3 +1937,147 @@ legend {
     gap: 6px;
   }
 }
+.camera-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 12px;
+  align-items: start;
+}
+/* The camera keeps its 4:3 shape from its column width; only the gauge stretches. */
+.camera-row .camera-stage {
+  width: 100%;
+}
+.camera-row .movement-gauge {
+  align-self: stretch;
+}
+.movement-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 0;
+}
+.gauge-title {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gauge-track {
+  position: relative;
+  flex: 1;
+  width: 28px;
+  min-height: 160px;
+  border-radius: 14px;
+  background: #edf0e8;
+  overflow: hidden;
+}
+.gauge-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    #d9e7cf,
+    #d9e7cf 4px,
+    #e6efdf 4px,
+    #e6efdf 8px
+  );
+  border-top: 2px solid #8fb07f;
+  border-bottom: 2px solid #8fb07f;
+}
+.gauge-band span {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #52735f;
+  white-space: nowrap;
+}
+.gauge-fill {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 10px;
+  background: #b9c4b2;
+  transition: height 0.12s linear;
+}
+.gauge-fill.zone-approach {
+  background: #d9a066;
+}
+.gauge-fill.zone-target {
+  background: #5f8a54;
+}
+.gauge-fill.zone-over {
+  background: #c0694f;
+}
+.gauge-peak {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 3px;
+  margin-top: -1.5px;
+  margin-bottom: -1.5px;
+  background: var(--ink);
+  border-radius: 2px;
+}
+.gauge-cue {
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  font-weight: 600;
+  color: var(--muted);
+  min-height: 3.6em;
+}
+.gauge-cue.zone-approach {
+  color: #a8662d;
+}
+.gauge-cue.zone-target {
+  color: #4d7740;
+}
+.gauge-cue.zone-over {
+  color: #a05e46;
+}
+@media (max-width: 700px) {
+  .camera-row {
+    grid-template-columns: minmax(0, 1fr) 72px;
+    gap: 8px;
+  }
+  .gauge-cue {
+    font-size: 11px;
+    min-height: 0;
+  }
+  .gauge-track {
+    min-height: 90px;
+  }
+  .movement-gauge {
+    padding: 8px 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gauge-fill {
+    transition: none;
+  }
+}
+@media (max-width: 700px) {
+  /* The camera shares the row with the gauge, so keep its idle state compact. */
+  .camera-row .camera-placeholder {
+    padding: 34px 12px 26px;
+  }
+  .camera-row .camera-placeholder h2,
+  .camera-row .camera-placeholder p,
+  .camera-row .camera-symbol {
+    display: none;
+  }
+  .camera-row .camera-bottom {
+    font-size: 10px;
+    left: 10px;
+    bottom: 8px;
+  }
+}

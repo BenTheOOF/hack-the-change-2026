@@ -16,6 +16,7 @@ import {
   type PoseFrame,
 } from "./engine";
 import { ExerciseSteps } from "./exercise-steps";
+import { MovementGauge } from "./movement-gauge";
 import { PoseReplay } from "./pose-replay";
 import type { Prescription } from "./types";
 
@@ -99,6 +100,12 @@ export function LiveSession({
     resumeAt = useRef(0);
   const segmenter = useRef(new RepSegmenter(plan.exercise));
   const [userPaused, setUserPaused] = useState(false);
+  // Live joint angle for the gauge, and the furthest angle of the current rep.
+  const [liveAngle, setLiveAngle] = useState<number | null>(null);
+  const [peakAngle, setPeakAngle] = useState<number | null>(null);
+  const peak = useRef<number | null>(null);
+  const further = (a: number, b: number | null) =>
+    b === null ? a : plan.exercise === "squat" ? Math.min(a, b) : Math.max(a, b);
   // Whole seconds left before tracking starts; null while checks are not all ready.
   const [holdLeft, setHoldLeft] = useState<number | null>(null);
   const holdShown = useRef<number | null>(null);
@@ -414,6 +421,16 @@ export function LiveSession({
                 light: brightness > 35 && brightness < 245,
               };
               setChecks(setup);
+              const reading = measure(
+                plan.exercise,
+                points,
+                video.current.videoWidth / video.current.videoHeight,
+              );
+              const angleNow =
+                reading.quality >= RULES.visible
+                  ? Math.round(reading.angle)
+                  : null;
+              setLiveAngle(angleNow);
               // Start tracking on its own once every check has held steadily.
               if (!running.current && !evaluating.current && !paused.current) {
                 const next = autoStart(
@@ -462,7 +479,17 @@ export function LiveSession({
                   aspect_ratio:
                     video.current.videoWidth / video.current.videoHeight,
                 });
-                if (!wasActive && segmenter.current.active) keepOldestTake();
+                if (!wasActive && segmenter.current.active) {
+                  keepOldestTake();
+                  peak.current = null;
+                }
+                if (segmenter.current.active && angleNow !== null) {
+                  const next = further(angleNow, peak.current);
+                  if (next !== peak.current) {
+                    peak.current = next;
+                    setPeakAngle(next);
+                  }
+                }
                 if (wasActive && !segmenter.current.active && !frames)
                   discardTakes();
                 if (frames) void evaluate(frames);
@@ -470,6 +497,7 @@ export function LiveSession({
             } else {
               ctx?.clearRect(0, 0, 640, 480);
               readySince.current = 0;
+              setLiveAngle(null);
               setChecks({ body: false, distance: false, light: false });
               // Do not join movements on either side of a complete tracking loss.
               segmenter.current.reset();
@@ -504,6 +532,14 @@ export function LiveSession({
         : kind === "incorrect"
           ? [5, 20, 40, 55, 40, 20, 5]
           : [5, 20, 55, 90, 55, 20, 5];
+    // Play the simulated movement on the gauge before judging it.
+    peak.current = null;
+    for (const a of angles) {
+      setLiveAngle(a);
+      peak.current = further(a, peak.current);
+      setPeakAngle(peak.current);
+      await new Promise((resolve) => setTimeout(resolve, 160));
+    }
     await evaluate(
       angles.map((a, i) =>
         demoFrame(
@@ -536,6 +572,7 @@ export function LiveSession({
             End session
           </button>
         </div>
+        <div className="camera-row">
         <div className="camera-stage">
           <video
             ref={video}
@@ -575,6 +612,12 @@ export function LiveSession({
               ? "Uncertain clips are shared with your therapist"
               : "Clips stay on this device"}
           </span>
+        </div>
+        <MovementGauge
+          exercise={plan.exercise}
+          angle={camera || demo ? liveAngle : null}
+          peak={peakAngle}
+        />
         </div>
         <div
           className={"feedback-banner" + (lastLabel ? " tone-" + lastLabel : "")}

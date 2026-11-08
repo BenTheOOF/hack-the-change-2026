@@ -251,6 +251,47 @@ export function autoStart(
   return { readySince, start: false };
 }
 
+// Where a joint angle sits on the movement gauge beside the camera.
+// position runs 0 (resting) to 1 (deepest/highest shown); the target band is
+// the range that counts, taken from RULES so the gauge matches the classifier.
+const GAUGE = {
+  squat: { from: 175, to: 40 },
+  shoulder_abduction: { from: 10, to: 150 },
+} as const;
+
+export type MovementZone = "rest" | "approach" | "target" | "over";
+
+export function movementProgress(exercise: Exercise, angle: number) {
+  const { from, to } = GAUGE[exercise];
+  const at = (a: number) =>
+    Math.max(0, Math.min(1, (a - from) / (to - from)));
+  const squat = exercise === "squat";
+  const [restEdge, bandStart, bandEnd] = squat
+    ? [RULES.squat.rest, RULES.squat.depthMax, RULES.squat.depthMin]
+    : [RULES.shoulder.rest, RULES.shoulder.peakMin, RULES.shoulder.peakMax];
+  const past = (a: number, edge: number) => (squat ? a <= edge : a >= edge);
+  const zone: MovementZone = past(angle, bandEnd) && angle !== bandEnd
+    ? "over"
+    : past(angle, bandStart)
+      ? "target"
+      : past(angle, restEdge) && angle !== restEdge
+        ? "approach"
+        : "rest";
+  const cue = {
+    rest: squat ? "Lower when you are ready" : "Raise your arms when ready",
+    approach: squat ? "Go a little lower" : "Raise a little higher",
+    target: squat ? "Good depth. Stand up slowly" : "Good height. Lower slowly",
+    over: squat ? "That is deep enough. Come up a little" : "High enough. Lower a little",
+  }[zone];
+  return {
+    position: at(angle),
+    bandStart: at(bandStart),
+    bandEnd: at(bandEnd),
+    zone,
+    cue,
+  };
+}
+
 export class RepSegmenter {
   private frames: PoseFrame[] = [];
   private ready: PoseFrame[] = [];
