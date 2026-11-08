@@ -2700,3 +2700,72 @@ legend {
     display: inline;
   }
 }
+
+/* Daily target reached: a choice over the camera, which stays paused meanwhile. */
+.finish-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+  background: #1d2f28eb;
+  backdrop-filter: blur(8px);
+  color: #fff;
+}
+.finish-mark {
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 11cqw, 60px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #a9c79a;
+  color: #1d2f28;
+  font-size: clamp(18px, 5.5cqw, 30px);
+  font-weight: 700;
+}
+.finish-title {
+  font-size: clamp(20px, 6cqw, 34px);
+  line-height: 1.15;
+  font-weight: 600;
+}
+.finish-detail {
+  max-width: 440px;
+  font-size: clamp(13px, 2.8cqw, 16px);
+  color: #d9e4d3;
+}
+.finish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.finish-actions .primary {
+  background: #d3dfc6;
+  color: #284333;
+  border: 0;
+}
+.finish-actions .secondary {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #ffffff80;
+}
+@container (max-width: 440px) {
+  .finish-overlay {
+    gap: 5px;
+    padding: 10px;
+  }
+  .finish-actions {
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .finish-actions button {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+}
