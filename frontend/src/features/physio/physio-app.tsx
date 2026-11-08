@@ -1495,86 +1495,96 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                       </button>
                     </div>
                   ) : (
-                    plans.map((plan, i) => {
-                      const count = todayReps.filter(
-                        (r) =>
-                          r.prescription_id === plan.id &&
-                          r.label === "correct",
-                      ).length;
-                      return (
-                        <article className="exercise-card" key={plan.id}>
-                          <div
-                            className={
-                              "exercise-art " +
-                              (i % 2 ? "art-peach" : "art-sage")
-                            }
-                          >
-                            <MovementIllustration exercise={plan.exercise} />
-                            <span className="art-number">0{i + 1}</span>
-                          </div>
-                          <div className="exercise-content">
-                            <span className="eyebrow">
-                              {info(plan).focus}
-                            </span>
-                            <h3>{info(plan).name}</h3>
-                            <p>
-                              {plan.instructions ||
-                                (plan.exercise === "squat"
-                                  ? "Build a steady foundation, one controlled movement at a time."
-                                  : plan.exercise === "custom"
-                                    ? info(plan).instruction
-                                    : "Find a little more freedom in every comfortable reach.")}
-                            </p>
-                            <ExerciseSteps steps={info(plan).steps} />
-                            {plan.custom_exercise_id && (
-                              <DemoVideo
-                                url={demoVideoUrls[plan.custom_exercise_id]}
-                                custom={info(plan).custom}
-                                onOpen={() => demoVideoFor(plan.custom_exercise_id!)}
-                                name={info(plan).name}
-                              />
-                            )}
-                            <div className="exercise-progress">
-                              <span>
-                                {count}{" "}
-                                <span className="muted">
-                                  / {plan.daily_target} reps
-                                </span>
-                              </span>
-                              <span>
-                                {count >= plan.daily_target
-                                  ? "Daily target reached ✓"
-                                  : "Daily target"}
-                              </span>
-                            </div>
-                            <div className="progress-track">
-                              <span
-                                style={{
-                                  width:
-                                    Math.min(
-                                      100,
-                                      (count / plan.daily_target) * 100,
-                                    ) + "%",
-                                }}
-                              />
-                            </div>
-                            <button
+                    // Exercises still to do come first; finished ones move to the end.
+                    plans
+                      .map((plan) => {
+                        const count = todayReps.filter(
+                          (r) =>
+                            r.prescription_id === plan.id &&
+                            r.label === "correct",
+                        ).length;
+                        return {
+                          plan,
+                          count,
+                          done: count >= plan.daily_target,
+                        };
+                      })
+                      .sort((a, b) => Number(a.done) - Number(b.done))
+                      .map(({ plan, count, done }, i) => {
+                        return (
+                          <article className="exercise-card" key={plan.id}>
+                            <div
                               className={
-                                (i % 2 ? "secondary" : "primary") +
-                                " start-exercise"
+                                "exercise-art " +
+                                (i % 2 ? "art-peach" : "art-sage")
                               }
-                              disabled={busy}
-                              onClick={() => void start(plan)}
                             >
-                              {count >= plan.daily_target
-                                ? "Practice again"
-                                : "Start exercise"}
-                              <span>↗</span>
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })
+                              <MovementIllustration exercise={plan.exercise} />
+                              <span className="art-number">0{i + 1}</span>
+                            </div>
+                            <div className="exercise-content">
+                              <span className="eyebrow">
+                                {info(plan).focus}
+                              </span>
+                              <h3>{info(plan).name}</h3>
+                              <p>
+                                {plan.instructions ||
+                                  (plan.exercise === "squat"
+                                    ? "Build a steady foundation, one controlled movement at a time."
+                                    : plan.exercise === "custom"
+                                      ? info(plan).instruction
+                                      : "Find a little more freedom in every comfortable reach.")}
+                              </p>
+                              <ExerciseSteps steps={info(plan).steps} />
+                              {plan.custom_exercise_id && (
+                                <DemoVideo
+                                  url={demoVideoUrls[plan.custom_exercise_id]}
+                                  custom={info(plan).custom}
+                                  onOpen={() =>
+                                    demoVideoFor(plan.custom_exercise_id!)
+                                  }
+                                  name={info(plan).name}
+                                />
+                              )}
+                              <div className="exercise-progress">
+                                <span>
+                                  {count}{" "}
+                                  <span className="muted">
+                                    / {plan.daily_target} reps
+                                  </span>
+                                </span>
+                                <span>
+                                  {done
+                                    ? "Daily target reached ✓"
+                                    : "Daily target"}
+                                </span>
+                              </div>
+                              <div className="progress-track">
+                                <span
+                                  style={{
+                                    width:
+                                      Math.min(
+                                        100,
+                                        (count / plan.daily_target) * 100,
+                                      ) + "%",
+                                  }}
+                                />
+                              </div>
+                              <button
+                                className={
+                                  (done ? "secondary" : "primary") +
+                                  " start-exercise"
+                                }
+                                disabled={busy}
+                                onClick={() => void start(plan)}
+                              >
+                                {done ? "Practice again" : "Start exercise"}
+                                <span>↗</span>
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })
                   )}
                 </section>
                 <aside>

@@ -2783,3 +2783,11 @@ legend {
   font-weight: 600;
   margin-bottom: 8px;
 }
+
+/* A finished exercise's button is white; exercises still to do keep the green one. */
+.start-exercise.secondary {
+  background: #fff;
+}
+.start-exercise.secondary:hover {
+  background: #edf1e8;
+}
