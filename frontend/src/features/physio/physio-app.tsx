@@ -756,6 +756,27 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       setNotice("Your privacy choices have been saved.");
     });
   }
+  // Video for a rep: this browser's copy first, then the shared review clip, else the pose only.
+  // Feedback items only know the rep id, so an unknown clip_path still tries the shared clip.
+  async function loadRepReplay(rep: ReplaySource): Promise<Replay> {
+    const frames: PoseFrame[] =
+      rep.frames ??
+      (demo ? [] : (await request("/reps/" + rep.id + "/pose")).frames);
+    if (rep.local_clip_url) return { frames, url: rep.local_clip_url };
+    const local = demo ? undefined : await getLocalClip(rep.id);
+    if (local)
+      return { frames, url: URL.createObjectURL(local), revoke: true };
+    if (!demo && rep.clip_path !== null) {
+      try {
+        const shared = await request("/reps/" + rep.id + "/clip");
+        return { frames, url: shared.url as string };
+      } catch {
+        /* No shared clip, or sharing was revoked: fall back to the pose. */
+      }
+    }
+    if (!frames.length) throw new Error("This rep has no recording.");
+    return { frames };
+  }
   async function openPage(next: string) {
     setPage(next);
     setSelected(null);
@@ -1613,32 +1634,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                   <RepList
                     reps={history}
                     customs={customs}
-                    loadReplay={async (rep) => {
-                      const frames: PoseFrame[] = demo
-                        ? (rep.frames ?? [])
-                        : rep.frames ??
-                          (await request("/reps/" + rep.id + "/pose")).frames;
-                      if (rep.local_clip_url)
-                        return { frames, url: rep.local_clip_url };
-                      const local = demo ? undefined : await getLocalClip(rep.id);
-                      if (local)
-                        return {
-                          frames,
-                          url: URL.createObjectURL(local),
-                          revoke: true,
-                        };
-                      if (!demo && rep.clip_path) {
-                        try {
-                          const shared = await request(
-                            "/reps/" + rep.id + "/clip",
-                          );
-                          return { frames, url: shared.url as string };
-                        } catch {
-                          /* Sharing was revoked: fall back to the pose. */
-                        }
-                      }
-                      return { frames };
-                    }}
+                    loadReplay={loadRepReplay}
                     videoIds={historyVideos}
                   />
                 )}
@@ -1690,6 +1686,15 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                           ? "This review counts toward the original exercise day."
                           : "Use this cue during your next comfortable repetition."}
                       </p>
+                      <RepClip
+                        load={() =>
+                          loadRepReplay(
+                            reps.find((r) => r.id === review.rep_id) ?? {
+                              id: review.rep_id,
+                            },
+                          )
+                        }
+                      />
                     </article>
                   ))
                 ) : (
@@ -1889,6 +1894,47 @@ function Empty({ title, text }: { title: string; text: string }) {
   );
 }
 type Replay = { frames: PoseFrame[]; url?: string; revoke?: boolean };
+type ReplaySource = Pick<Rep, "id"> &
+  Partial<Pick<Rep, "frames" | "local_clip_url" | "clip_path">>;
+
+// The reviewed rep, shown under the therapist's comment. Loads once when the card appears.
+function RepClip({ load }: { load: () => Promise<Replay> }) {
+  const loader = useRef(load);
+  const [replay, setReplay] = useState<Replay | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    let loaded: Replay | undefined;
+    loader.current().then(
+      (result) => {
+        loaded = result;
+        if (live) setReplay(result);
+        else if (result.revoke && result.url) URL.revokeObjectURL(result.url);
+      },
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+      if (loaded?.revoke && loaded.url) URL.revokeObjectURL(loaded.url);
+    };
+  }, []);
+  return (
+    <div className="feedback-clip">
+      <span className="feedback-clip-label">
+        The rep your therapist reviewed
+      </span>
+      {failed ? (
+        <p className="muted">
+          The recording of this rep is no longer available.
+        </p>
+      ) : !replay ? (
+        <p className="muted">Loading your rep…</p>
+      ) : (
+        <PoseReplay frames={replay.frames} videoUrl={replay.url} />
+      )}
+    </div>
+  );
+}
 function RepList({
   reps,
   customs,

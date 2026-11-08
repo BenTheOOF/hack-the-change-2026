@@ -2,7 +2,7 @@
 
 Private exercise feedback for physiotherapy patients, with a review loop for their physical therapist.
 
-The implemented MVP includes bodyweight squat and standing shoulder abduction, browser pose tracking and skeleton overlay, complete-rep segmentation, a versioned rule classifier, daily targets and history, therapist prescriptions, a review queue, and patient feedback. An uncertain rep counts only after an assigned therapist accepts it.
+The implemented MVP includes bodyweight squat and standing shoulder abduction, browser pose tracking and skeleton overlay, complete-rep segmentation, a versioned rule classifier, daily targets and history, therapist prescriptions, a review queue, and patient feedback. An uncertain rep counts only after an assigned therapist accepts it. Each therapist comment in the patient's feedback feed shows the rep it is about: the video kept on that device, else the clip the patient shared for review, else the pose replay.
 
 No training has been run. The optional offline ML group uses CUDA PyTorch on Windows and Linux and MLX on Apple Silicon. The app uses a rule baseline, not a trained exercise classifier.
 
