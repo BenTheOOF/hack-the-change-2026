@@ -1890,3 +1890,34 @@ legend {
   border-radius: 999px;
   padding: 6px 12px;
 }
+.rep-item {
+  border-bottom: 1px solid var(--line);
+}
+.rep-item:last-child {
+  border: 0;
+}
+.rep-item .rep-row {
+  border: 0;
+}
+.watch-button {
+  white-space: nowrap;
+  font-size: 12px;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+.history-replay {
+  max-width: 560px;
+  padding: 0 0 20px 48px;
+}
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .history-replay {
+    padding-left: 0;
+  }
+}

@@ -88,14 +88,14 @@ test("typical lite-model tracking and a moderate rehab squat count", () => {
   );
 });
 
-test("tracking starts only after every check holds and the replay pause ends", () => {
+test("tracking starts only after every check holds 2 s and the replay pause ends", () => {
   let state = autoStart(0, true, 1000, 0);
   assert.deepEqual(state, { readySince: 1000, start: false });
-  assert.equal(autoStart(state.readySince, true, 2000, 0).start, false);
+  assert.equal(autoStart(state.readySince, true, 2900, 0).start, false);
   assert.deepEqual(autoStart(0, false, 2400, 0), { readySince: 0, start: false });
-  assert.equal(autoStart(state.readySince, true, 2600, 0).start, true);
+  assert.equal(autoStart(state.readySince, true, 3000, 0).start, true);
   // After an incorrect rep the replay pause delays the restart.
-  state = autoStart(state.readySince, true, 2600, 4000);
+  state = autoStart(state.readySince, true, 3000, 4500);
   assert.equal(state.start, false);
-  assert.equal(autoStart(state.readySince, true, 4000, 4000).start, true);
+  assert.equal(autoStart(state.readySince, true, 4500, 4500).start, true);
 });

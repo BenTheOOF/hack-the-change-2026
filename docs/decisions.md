@@ -40,4 +40,10 @@ Training from YouTube videos was requested and declined. The project rules forbi
 
 ## 2026-11-07: automatic start and visible instructions
 
-Tracking starts on its own once body-in-frame, lighting, and distance checks have held for 1.5 s, replacing the Begin set button. After an incorrect or uncertain rep it waits 3 s for the replay, then resumes when the checks hold again. Pause stops automatic restarts until the patient presses Resume. Step-by-step instructions for each exercise appear on the Today page cards and below the camera in the session.
+Tracking starts on its own once body-in-frame, lighting, and distance checks have held for 2 s (1.5 s at first), replacing the Begin set button. After an incorrect or uncertain rep it waits 3 s for the replay, then resumes when the checks hold again. Pause stops automatic restarts until the patient presses Resume. Step-by-step instructions for each exercise appear on the Today page cards and below the camera in the session.
+
+## 2026-11-07: rep videos for the therapist and in patient history
+
+Every rep the camera records is now kept on the patient's device in IndexedDB (newest 60 clips), and the history page plays it with the skeleton overlay. This is local storage, not an upload, so it stays within "video stays on the device". If the browser blocks storage, history falls back to the pose replay.
+
+The therapist review plays the real video first, with a toggle for the skeleton overlay. Uploading a clip to the therapist still requires the patient's review-sharing consent, as required by the project rules; without it the therapist sees the pose replay and a note saying no video was shared. The session screen states which mode is active. In the demo, where nothing leaves the browser, the therapist view plays the local clip of a camera-recorded rep. A patient's history also plays clips they shared from another device, through the existing signed-URL route.

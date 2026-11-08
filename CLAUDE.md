@@ -94,4 +94,5 @@ without changes elsewhere.
 - Phase 4 (2026-11-07): offline ML accelerator is CUDA PyTorch (Windows/Linux) or MLX (Apple Silicon) via the optional uv `ml` group; `backend/check_accelerator.py` verifies it with no CPU fallback. MLX verified on an Apple GPU.
 - Phase 4 frontend polish: larger minimum type and system font stack, live-session result banner (counted / adjust / sent for review), incorrect-rep replay scrolls into view, daily target progress inside the session, flag reason shown to the therapist, decorative arrows removed.
 - Phase 5 (2026-11-07): rule baseline recalibrated to `rules-1.1.0` (visibility-based confidence rescaled, wider rehab ranges) in both browser and backend; tracking auto-starts when setup checks hold; step-by-step instructions on the Today page and in the session.
+- Phase 6 (2026-11-07): therapist review plays the real rep video (skeleton overlay toggle) when the patient shares clips; patients rewatch every rep's video in history from on-device IndexedDB storage; auto-start hold is 2 s with a countdown.
 - Training: intentionally not run. No YouTube or scraped data (see `docs/decisions.md`).

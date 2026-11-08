@@ -13,6 +13,7 @@ import {
 } from "./engine";
 import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
+import { getLocalClip, localClipIds, saveLocalClip } from "./local-clips";
 import { PoseReplay } from "./pose-replay";
 import type { Overview, Prescription, Profile, Rep, Review } from "./types";
 
@@ -71,6 +72,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
   );
   const [reps, setReps] = useState<Rep[]>([]),
     [reviews, setReviews] = useState<Review[]>([]);
+  const [historyVideos, setHistoryVideos] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<Rep[]>([]),
     [moreHistory, setMoreHistory] = useState(false);
   const [page, setPage] = useState("today"),
@@ -249,6 +251,11 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           client_rep_id: crypto.randomUUID(),
           frames,
         });
+    if (video) {
+      // Keep every rep's video on this device for the patient's own history.
+      rep.local_clip_url = URL.createObjectURL(video);
+      if (!demo) void saveLocalClip(rep.id, video);
+    }
     setReps((current) => [rep, ...current.filter((r) => r.id !== rep.id)]);
     if (
       !demo &&
@@ -293,7 +300,8 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
           : (await request("/reps/" + rep.id + "/pose")).frames,
       );
       setSelected(rep);
-      if (!demo && rep.clip_path) {
+      if (demo) setClip(rep.local_clip_url);
+      else if (rep.clip_path) {
         try {
           setClip((await request("/reps/" + rep.id + "/clip")).url);
         } catch {
@@ -352,6 +360,14 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
       await guarded(async () => {
         const data: Rep[] = demo ? reps : await request("/history");
         setHistory(data);
+        const ids = demo ? new Set<string>() : await localClipIds();
+        setHistoryVideos(
+          new Set(
+            data
+              .filter((r) => r.local_clip_url || r.clip_path || ids.has(r.id))
+              .map((r) => r.id),
+          ),
+        );
         setMoreHistory(data.length === 50);
       });
     if (next === "feedback" && !demo) await load();
@@ -660,10 +676,13 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                           {selected.model_version} · {selected.exercise_day}
                         </span>
                       </p>
-                      <p className="muted">
-                        Recorded keypoints are available even when the patient
-                        has not shared video.
-                      </p>
+                      {!clip && (
+                        <p className="muted">
+                          {demo
+                            ? "Simulated reps have no video. Turn on the camera in a patient session to record one."
+                            : "This patient has not shared video for this rep, so only the recorded pose is shown."}
+                        </p>
+                      )}
                       <form onSubmit={saveReview} className="review-form">
                         <fieldset>
                           <legend>Your assessment</legend>
@@ -968,7 +987,36 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                     text="Complete an exercise to see your history here."
                   />
                 ) : (
-                  <RepList reps={history} />
+                  <RepList
+                    reps={history}
+                    loadReplay={async (rep) => {
+                      const frames: PoseFrame[] = demo
+                        ? (rep.frames ?? [])
+                        : rep.frames ??
+                          (await request("/reps/" + rep.id + "/pose")).frames;
+                      if (rep.local_clip_url)
+                        return { frames, url: rep.local_clip_url };
+                      const local = demo ? undefined : await getLocalClip(rep.id);
+                      if (local)
+                        return {
+                          frames,
+                          url: URL.createObjectURL(local),
+                          revoke: true,
+                        };
+                      if (!demo && rep.clip_path) {
+                        try {
+                          const shared = await request(
+                            "/reps/" + rep.id + "/clip",
+                          );
+                          return { frames, url: shared.url as string };
+                        } catch {
+                          /* Sharing was revoked: fall back to the pose. */
+                        }
+                      }
+                      return { frames };
+                    }}
+                    videoIds={historyVideos}
+                  />
                 )}
                 {moreHistory && (
                   <button
@@ -1167,29 +1215,90 @@ function Empty({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
-function RepList({ reps }: { reps: Rep[] }) {
+type Replay = { frames: PoseFrame[]; url?: string; revoke?: boolean };
+function RepList({
+  reps,
+  loadReplay,
+  videoIds,
+}: {
+  reps: Rep[];
+  loadReplay: (rep: Rep) => Promise<Replay>;
+  videoIds: Set<string>;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [replay, setReplay] = useState<Replay | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(
+    () => () => {
+      if (replay?.revoke && replay.url) URL.revokeObjectURL(replay.url);
+    },
+    [replay],
+  );
+  async function toggle(rep: Rep) {
+    setReplay(null);
+    setFailed(false);
+    if (open === rep.id) {
+      setOpen(null);
+      return;
+    }
+    setOpen(rep.id);
+    setLoading(true);
+    try {
+      setReplay(await loadReplay(rep));
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }
   return (
     <div className="rep-list">
       {reps.map((rep) => (
-        <div className="rep-row" key={rep.id}>
-          <span className="exercise-symbol">
-            {rep.exercise === "squat" ? "↧" : "↟"}
-          </span>
-          <div>
-            <strong>{EXERCISES[rep.exercise].name}</strong>
-            <small>
-              {rep.exercise_day} · {Math.round(rep.confidence * 100)}%
-              confidence
-            </small>
-            <p>{rep.feedback}</p>
+        <div className="rep-item" key={rep.id}>
+          <div className="rep-row">
+            <span className="exercise-symbol">
+              {rep.exercise === "squat" ? "↧" : "↟"}
+            </span>
+            <div>
+              <strong>{EXERCISES[rep.exercise].name}</strong>
+              <small>
+                {rep.exercise_day} · {Math.round(rep.confidence * 100)}%
+                confidence
+              </small>
+              <p>{rep.feedback}</p>
+            </div>
+            <span className={"badge " + rep.label}>
+              {rep.label === "correct"
+                ? "Accepted"
+                : rep.label === "incorrect"
+                  ? "Adjustment"
+                  : "Pending review"}
+            </span>
+            <button
+              type="button"
+              className="secondary watch-button"
+              aria-expanded={open === rep.id}
+              onClick={() => void toggle(rep)}
+            >
+              {open === rep.id
+                ? "Close"
+                : videoIds.has(rep.id)
+                  ? "▶ Watch video"
+                  : "▶ Pose replay"}
+            </button>
           </div>
-          <span className={"badge " + rep.label}>
-            {rep.label === "correct"
-              ? "Accepted"
-              : rep.label === "incorrect"
-                ? "Adjustment"
-                : "Pending review"}
-          </span>
+          {open === rep.id && (
+            <div className="history-replay">
+              {loading ? (
+                <p className="muted">Loading replay…</p>
+              ) : failed || !replay ? (
+                <p className="muted">This replay could not be loaded.</p>
+              ) : (
+                <PoseReplay frames={replay.frames} videoUrl={replay.url} />
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>

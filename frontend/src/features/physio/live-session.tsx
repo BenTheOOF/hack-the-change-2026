@@ -48,7 +48,7 @@ export function cameraErrorMessage(error: unknown): string {
     : "The camera could not start. Please try again.";
 }
 
-const READY_HOLD_MS = 1500;
+const READY_HOLD_MS = 2000;
 const REPLAY_PAUSE_MS = 3000;
 
 type Props = {
@@ -89,6 +89,9 @@ export function LiveSession({
     resumeAt = useRef(0);
   const segmenter = useRef(new RepSegmenter(plan.exercise));
   const [userPaused, setUserPaused] = useState(false);
+  // Whole seconds left before tracking starts; null while checks are not all ready.
+  const [holdLeft, setHoldLeft] = useState<number | null>(null);
+  const holdShown = useRef<number | null>(null);
   const [camera, setCamera] = useState(false),
     [loading, setLoading] = useState(false),
     [active, setActive] = useState(false);
@@ -190,7 +193,7 @@ export function LiveSession({
       const saved = await onRep(
         frames,
         local,
-        uploadConsent ? clip : undefined,
+        clip,
       );
       if (!mounted.current) return;
       if (lastUrl.current) URL.revokeObjectURL(lastUrl.current);
@@ -378,7 +381,25 @@ export function LiveSession({
                   READY_HOLD_MS,
                 );
                 readySince.current = next.readySince;
+                const left = next.readySince
+                  ? Math.max(
+                      1,
+                      Math.ceil(
+                        (Math.max(
+                          READY_HOLD_MS - (now - next.readySince),
+                          resumeAt.current - now,
+                        )) /
+                          1000,
+                      ),
+                    )
+                  : null;
+                if (left !== holdShown.current) {
+                  holdShown.current = left;
+                  setHoldLeft(left);
+                }
                 if (next.start) {
+                  holdShown.current = null;
+                  setHoldLeft(null);
                   segmenter.current.reset();
                   running.current = true;
                   setActive(true);
@@ -504,7 +525,12 @@ export function LiveSession({
             <span className="status-dot" />{" "}
             {camera ? "On-device pose tracking" : "Camera is off"}
           </span>
-          <span className="camera-bottom">No audio · Private by default</span>
+          <span className="camera-bottom">
+            No audio ·{" "}
+            {uploadConsent
+              ? "Uncertain clips are shared with your therapist"
+              : "Clips stay on this device"}
+          </span>
         </div>
         <div
           className={"feedback-banner" + (lastLabel ? " tone-" + lastLabel : "")}
@@ -541,9 +567,9 @@ export function LiveSession({
           )}
           {camera && !active && !userPaused && (
             <span className="auto-start-hint">
-              {checks.body && checks.light && checks.distance
-                ? "Starting…"
-                : "Starts when all checks are ready"}
+              {holdLeft !== null
+                ? "Hold still… starting in " + holdLeft
+                : "Starts after all checks stay ready for 2 seconds"}
             </span>
           )}
           {active && (

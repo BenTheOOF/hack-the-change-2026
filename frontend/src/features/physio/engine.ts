@@ -206,7 +206,7 @@ export function autoStart(
   ready: boolean,
   now: number,
   resumeAt: number,
-  holdMs = 1500,
+  holdMs = 2000,
 ): { readySince: number; start: boolean } {
   if (!ready) return { readySince: 0, start: false };
   if (!readySince) return { readySince: now, start: false };

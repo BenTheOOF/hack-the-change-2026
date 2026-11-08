@@ -27,6 +27,8 @@ export type Rep = Evaluation & {
   created_at: string;
   clip_path?: string | null;
   frames?: PoseFrame[];
+  // In-memory object URL for a clip recorded in this browser session.
+  local_clip_url?: string;
 };
 export type Review = {
   id: string;
