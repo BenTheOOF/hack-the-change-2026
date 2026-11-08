@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 
 function credentials(form: FormData) {
@@ -67,10 +68,7 @@ export async function googleSignIn() {
       "/login?error=Configure%20Supabase%20in%20the%20root%20.env%20first",
     );
   }
-  const head = await headers();
-  const origin =
-    head.get("origin") ??
-    `${head.get("x-forwarded-proto") ?? "http"}://${head.get("host")}`;
+  const origin = siteOrigin(await headers());
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

@@ -9,7 +9,7 @@
     "prebuild": "node scripts/prepare-pose.mjs",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/features/physio/engine.test.ts src/features/physio/template.test.ts src/features/physio/trim.test.ts",
+    "test": "node --test src/features/physio/engine.test.ts src/features/physio/template.test.ts src/features/physio/trim.test.ts src/lib/site-origin.test.ts",
     "pose:setup": "node scripts/prepare-pose.mjs"
   },
   "dependencies": {

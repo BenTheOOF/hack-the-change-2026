@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { siteOrigin } from "@/lib/site-origin";
 
 // Refreshes the session cookie on every request and sends signed-out visitors away from /dashboard.
 export async function updateSession(request: NextRequest) {
@@ -12,7 +13,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(
         new URL(
           "/login?error=Connect%20Supabase%20to%20open%20your%20saved%20care%20plan",
-          request.url,
+          siteOrigin(request.headers),
         ),
       );
     }
@@ -39,7 +40,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
 
   if (!data?.claims && request.nextUrl.pathname.startsWith("/dashboard")) {
-    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    const redirect = NextResponse.redirect(new URL("/login", siteOrigin(request.headers)));
     // Keep any cookies the refresh just set.
     response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
     return redirect;
