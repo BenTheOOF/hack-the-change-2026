@@ -2611,3 +2611,92 @@ legend {
     align-items: stretch;
   }
 }
+
+/* Setup instruction over the camera, readable from a few metres away. Sized
+   from the camera's own width, which changes with the layout. */
+.camera-stage {
+  container-type: inline-size;
+}
+.setup-overlay {
+  position: absolute;
+  top: max(48px, 11cqw);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(88%, 540px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: #1d2f28e6;
+  border: 2px solid #f0ae8c;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+}
+.setup-overlay.tone-ready {
+  border-color: #a9c79a;
+}
+.setup-overlay-title {
+  font-size: clamp(17px, 5.4cqw, 32px);
+  line-height: 1.15;
+  font-weight: 600;
+}
+.setup-overlay-detail {
+  font-size: 15px;
+  color: #d9e4d3;
+}
+.setup-overlay-checks {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.setup-overlay-checks li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: clamp(11px, 2.4cqw, 14px);
+  font-weight: 600;
+  background: #f0ae8c33;
+  color: #ffd9c4;
+}
+.setup-overlay-checks .label-short {
+  display: none;
+}
+.setup-overlay-checks li.ready {
+  background: #a9c79a33;
+  color: #d4ebc8;
+}
+/* Small camera (phone, or a narrow column): title and checks only. */
+@container (max-width: 440px) {
+  .setup-overlay {
+    top: 36px;
+    width: calc(100% - 16px);
+    padding: 8px 10px;
+  }
+  .setup-overlay-detail {
+    display: none;
+  }
+  .setup-overlay-checks {
+    gap: 4px;
+    margin-top: 2px;
+    flex-wrap: nowrap;
+  }
+  .setup-overlay-checks li {
+    padding: 2px 7px;
+  }
+  .setup-overlay-checks .label-full {
+    display: none;
+  }
+  .setup-overlay-checks .label-short {
+    display: inline;
+  }
+}

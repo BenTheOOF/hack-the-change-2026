@@ -17,6 +17,7 @@ import {
   type PoseFrame,
 } from "./engine";
 import { ExerciseSteps } from "./exercise-steps";
+import { setupPrompt, type SetupChecks, type SetupPrompt } from "./setup-prompt";
 import { MovementGauge } from "./movement-gauge";
 import type { ExerciseInfo, Movement } from "./movement";
 import { createPoseLandmarker } from "./pose-model";
@@ -111,8 +112,9 @@ export function LiveSession({
     [loading, setLoading] = useState(false),
     [active, setActive] = useState(false);
   // "Move a little closer" or "Step back a little" beside the distance check.
-  const [distanceTip, setDistanceTip] = useState("");
-  const distanceHint = useRef("");
+  // Starts as "Step into view" so the overlay asks for that until someone is detected.
+  const [distanceTip, setDistanceTip] = useState("Step into view");
+  const distanceHint = useRef("Step into view");
   const [checks, setChecks] = useState({
     body: false,
     light: false,
@@ -506,6 +508,11 @@ export function LiveSession({
               readySince.current = 0;
               setLiveAngle(null);
               setChecks({ body: false, distance: false, light: false });
+              // Nobody detected: say so, rather than blaming the lighting.
+              if (distanceHint.current !== "Step into view") {
+                distanceHint.current = "Step into view";
+                setDistanceTip("Step into view");
+              }
               if (segmenter.current.active)
                 setFeedback(
                   "We lost sight of you mid-rep. Keep your whole body in view, then start the next rep from rest.",
@@ -643,6 +650,12 @@ export function LiveSession({
                 {loading ? "Preparing camera…" : "Turn on camera"}
               </button>
             </div>
+          )}
+          {camera && !active && !userPaused && (
+            <SetupOverlay
+              prompt={setupPrompt(checks, distanceTip, holdLeft)}
+              checks={checks}
+            />
           )}
           <span className="camera-chip">
             <span className="status-dot" />{" "}
@@ -854,5 +867,46 @@ export function LiveSession({
         </div>
       </aside>
     </section>
+  );
+}
+
+// Big, direct setup instruction over the camera, so it can be read from 2 to 3
+// metres away. The side panel keeps the full checklist.
+function SetupOverlay({
+  prompt,
+  checks,
+}: {
+  prompt: SetupPrompt;
+  checks: SetupChecks;
+}) {
+  // Full label, and the short one used when the camera view is small.
+  const items: [keyof SetupChecks, string, string][] = [
+    ["body", "Body in frame", "Body"],
+    ["light", "Lighting", "Light"],
+    ["distance", "Distance", "Distance"],
+  ];
+  return (
+    <div
+      className={"setup-overlay tone-" + prompt.tone}
+      role="status"
+      aria-live="polite"
+    >
+      <strong className="setup-overlay-title">{prompt.title}</strong>
+      <span className="setup-overlay-detail">{prompt.detail}</span>
+      {prompt.showChecks && (
+        <ul className="setup-overlay-checks">
+          {items.map(([key, label, short]) => (
+            <li key={key} className={checks[key] ? "ready" : ""}>
+              <span aria-hidden="true">{checks[key] ? "✓" : "✕"}</span>
+              <span className="label-full">{label}</span>
+              <span className="label-short">{short}</span>
+              <span className="sr-only">
+                {checks[key] ? " ready" : " not ready"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
