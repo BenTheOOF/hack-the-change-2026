@@ -121,3 +121,7 @@ The site now has a favicon (`app/favicon.ico` at 16, 32, and 48 px, `app/icon.sv
 ## 2026-11-08: Google names for existing accounts
 
 Accounts that signed up with Google before the admin migration kept the default name "Patient", because the old profile trigger only read `display_name`, which Google does not send. Migration `20261108050000_google_names.sql` fills in the Google name (`full_name` or `name`) for profiles still named "Patient", and a trigger on `auth.users` does the same on later sign-ins, since Supabase rewrites the metadata on each OAuth sign-in. A name the person chose is never overwritten, and the metadata still cannot change a role.
+
+## 2026-11-08: deeper squat target (rules-1.2.0)
+
+The user asked for the squat target band on the movement gauge to sit lower. The band's top edge is the classifier's squat depth limit, so both move together: the knee angle at the bottom must now be 50 to 115 degrees (was 50 to 130). A 120 degree squat that counted under rules-1.1.0 is now incorrect with `range_of_motion`. Browser and backend share the constant, the version is `rules-1.2.0`, and the squat step text points patients at the band while still telling them never to go past what is comfortable. Still a prototype default that needs therapist validation; a per-prescription depth would be the next step if therapists need different targets.
