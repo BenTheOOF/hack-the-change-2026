@@ -127,14 +127,7 @@ uv run pytest
 
 `uv run pytest` syncs only the default groups. Use `uv run --group ml pytest` to preserve an installed CUDA or MLX environment. The seven backend tests cover routing, authentication, role checks, replay-safe submission, review validation, and secret-header handling. Three Node tests cover both exercise state machines and confidence routing.
 
-For the disposable PostgreSQL checks, install a local verification runtime without changing app dependencies:
-
-```powershell
-npm install --prefix .tools/verification --no-audit --no-fund @electric-sql/pglite
-node scripts/check-care-db.mjs .tools/verification/node_modules/@electric-sql/pglite/dist/index.js
-```
-
-These checks execute the migration and test RLS, role protection, retry idempotency, review correction, and consent revocation. They never connect to Supabase or train a model.
+The PostgreSQL row-level security checks run against a throwaway PGlite database. See [docs/verification.md](docs/verification.md#run-the-database-checks).
 
 Deploying to your own server and domain (AWS or Vultr) is covered step by step in `docs/deployment.md`.
 
