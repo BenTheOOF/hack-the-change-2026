@@ -1,16 +1,76 @@
 # PhysioTrace
 
-Private exercise feedback for physiotherapy patients, with a review loop for their physical therapist.
+PhysioTrace watches a patient do their prescribed physio exercises through the browser camera, checks each rep, and sends the unclear ones to their physical therapist.
 
-The implemented MVP includes bodyweight squat and standing shoulder abduction, browser pose tracking and skeleton overlay, complete-rep segmentation, a versioned rule classifier, daily targets and history, therapist prescriptions, a review queue, and patient feedback. An uncertain rep counts only after an assigned therapist accepts it. Each therapist comment in the patient's feedback feed shows the rep it is about: the video kept on that device, else the clip the patient shared for review, else the pose replay.
+<!-- AWARD PHOTO: docs/images/award.jpg (added later) -->
 
-No training has been run. The optional offline ML group uses CUDA PyTorch on Windows and Linux and MLX on Apple Silicon. The app uses a rule baseline, not a trained exercise classifier.
+🥈 2nd place overall and winner of the [Entire](https://entire.com/about/company) category at Hack the Change 2026.
 
-## Run the implementation on this Windows workspace
+## What it is
 
-The local tools are already downloaded under the ignored `.tools/` folder, and dependencies are installed.
+Dave does his squats in the living room. PhysioTrace counts the good reps, replays the ones that need adjusting, and sends the unclear ones to his therapist. Pose tracking runs in the browser with MediaPipe, and the video stays on his device. A versioned rule classifier (`rules-1.2.0`) judges each rep from joint angles and tracking confidence. Therapists review uncertain reps, label them, send written feedback, and can add their own exercises from a demo video. A template fitter (`template-1.1.0`) learns those from the video. No neural network has been trained. MediaPipe's pose model is the only pretrained model in the project.
 
-Open two PowerShell terminals at the repository root:
+Try it without an account at `/demo` once it's running locally (see [Run it locally](#run-it-locally)).
+
+## Screenshots
+
+|                                                                                         |                                                                                      |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![Landing page](docs/images/landing.png)                                                | ![Patient session with the movement gauge](docs/images/patient-session.png)          |
+| Landing page                                                                            | Live session with the depth gauge and its target band                                |
+| ![Incorrect rep replayed with a skeleton overlay](docs/images/incorrect-rep-replay.png) | ![Therapist review queue](docs/images/therapist-review.png)                          |
+| An incorrect rep, replayed with a skeleton and a cue                                    | Therapist review queue with the flagged rep                                          |
+| ![Patient feedback feed](docs/images/patient-feedback.png)                              | ![Adding a custom exercise and trimming the demo](docs/images/add-exercise-trim.png) |
+| Therapist feedback in the patient's feed                                                | Adding an exercise and trimming its demo video                                       |
+
+<p align="center"><img src="docs/images/patient-session-mobile.png" alt="Patient session on a phone" width="260"></p>
+
+The screenshots come from the demo's simulated reps. The trim screen shows the browser's fake test camera, not a person.
+
+## How it works
+
+![PhysioTrace architecture](docs/diagrams/architecture.svg)
+
+1. MediaPipe Pose Landmarker turns each camera frame into body keypoints in the browser.
+2. A state machine for each exercise splits the keypoint stream into reps using joint-angle thresholds.
+3. The classifier returns `correct`, `incorrect`, or `inconclusive` with a confidence score. The API runs the same rules again on the keypoints before it saves a rep.
+4. The rep is routed by that label and the confidence threshold on the patient's plan:
+
+![How each rep is routed](docs/diagrams/rep-routing.svg)
+
+Therapists can also add their own exercises. The worker in `ml/worker.py` runs outside the API, so no training ever happens inside a request:
+
+![Custom exercise pipeline](docs/diagrams/custom-exercise.svg)
+
+## Design choices
+
+- The classifiers only see pose keypoint sequences. Camera frames are never sent anywhere for classification.
+- Video stays on the device. Each rep's clip is kept in the browser's IndexedDB for the patient's own history, and a clip is uploaded only when the rep is uncertain and the patient has turned on review consent. Training consent is a separate setting. It's off by default and doesn't start any training.
+- The rule baseline and the template model implement the same `RepClassifier` contract (`frontend/src/features/physio/engine.ts`, mirrored in `backend/app/physio.py`), so a trained model can replace them later without changes elsewhere.
+- Every care table in Postgres has row-level security. A therapist sees only the patients assigned to them, and admins manage accounts without access to clinical records.
+- The interface is built for patients in their 60s and older: body text is at least 16px, buttons are 44px tall, and each screen has one obvious next step. We checked all 20 text and background pairs in the palette (`frontend/src/app/globals.css`) with a contrast script, and every one passes WCAG AA. The lowest is 4.98:1. Input borders and the focus ring pass 3:1.
+- The app tells patients to stop if they feel pain and says it supports a therapist's care. The rule ranges are prototype values that still need clinical validation.
+
+## Why it matters
+
+Patients do their home exercises between appointments with nobody checking their form, and in Alberta those gaps can be long. In 2023, the median wait from a GP referral to treatment by a specialist was 33.5 weeks in Alberta, against 27.7 weeks across Canada ([Fraser Institute, _Waiting Your Turn: Wait Times for Health Care in Canada, 2023_](https://www.fraserinstitute.org/sites/default/files/waiting-your-turn-2023.pdf)). That figure covers specialist care in general, not physiotherapy alone. PhysioTrace lets a therapist see home practice between visits, and they only review the reps the rules can't judge.
+
+## Run it locally
+
+You need Node.js 24 and [uv](https://docs.astral.sh/uv/). Supabase is optional, because the landing page and `/demo` work with blank keys.
+
+macOS or Linux:
+
+```bash
+cp -n .env.example .env
+./scripts/dev.sh
+```
+
+Windows (PowerShell): install the frontend once, then run the API and the web app in two terminals.
+
+```powershell
+npm ci --prefix frontend
+```
 
 ```powershell
 .\scripts\backend.ps1
@@ -20,122 +80,52 @@ Open two PowerShell terminals at the repository root:
 .\scripts\frontend.ps1
 ```
 
-Open [the interactive demo](http://127.0.0.1:3000/demo). It needs no account and never uploads anything. Demo reps, feedback, and clips are saved in this browser across refreshes until you press Clear demo data. Use the Patient and Therapist switches to exercise the entire feedback loop. Simulated good, incorrect, and uncertain reps work without camera access.
+Then open <http://127.0.0.1:3000/demo>. The demo stores its data in your browser until you press Clear demo data, and it uploads nothing.
 
-The backend script creates the single root `.env` from `.env.example` if it is missing. Fill in the Supabase values to use saved care records. The landing page and demo work with blank values. Camera use requires HTTPS or localhost and explicit browser permission. Opening the dev server from a phone at the LAN address over plain HTTP will not expose the camera. The in-app browser of some editors blocks the camera, so test live sessions in Chrome, Edge, Safari, or Firefox.
+Connecting Supabase, Google sign-in, admins, the exercise trainer, the AI assistant, and the optional CUDA/MLX setup are covered in [docs/setup.md](docs/setup.md). Production deployment is in [docs/deployment.md](docs/deployment.md).
 
-## Run on macOS or Linux
-
-```bash
-cp -n .env.example .env
-cd backend && uv sync && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+## Tests
 
 ```bash
-cd frontend && npm ci && npm run dev
+cd frontend && npm run typecheck && npm test && npm run build
+cd backend && uv run pytest
 ```
 
-## Set up a fresh checkout
+The frontend tests use Node's built-in runner and cover the exercise state machines, confidence routing, the template fitter, trimming, and setup prompts. The backend tests cover auth, role checks, rep submission, reviews, custom exercises, admin routes, and the template fitter. The TypeScript and Python template fitters are checked against the same fixtures in `ml/fixtures/`. The row-level security checks run against a throwaway PGlite database ([docs/verification.md](docs/verification.md#run-the-database-checks)). CI runs all of the commands above on every push and pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
-Install Node.js 24 LTS and uv. Keep exactly one `.env` at the repository root.
+## Project layout
 
-```powershell
-Copy-Item .env.example .env
-cd backend
-uv python install 3.12.16
-uv sync
-cd ..\frontend
-npm ci
-npm run pose:setup
+```text
+.
+├── frontend/             Next.js 16 app (Vercel)
+│   ├── src/app/          thin route pages: /, /demo, /dashboard, /login, /signup
+│   ├── src/features/     physio (patient + therapist UI, engine), auth, ai, ui
+│   ├── src/lib/          Supabase clients and API helper
+│   └── scripts/          prepare-pose.mjs (MediaPipe assets)
+├── backend/              FastAPI app (Fly)
+│   ├── app/              routers, auth, rule classifier, template classifier
+│   ├── supabase/         migrations, RLS, admin SQL
+│   └── tests/            pytest
+├── ml/                   offline template fitter, worker, shared fixtures
+├── scripts/              dev, worker, push-env, worktree helpers
+├── docs/                 setup, deployment, architecture, decisions, diagrams, images
+├── AGENTS.md             project brief for coding agents (CLAUDE.md points here)
+└── CONTRIBUTING.md       coding standards
 ```
 
-The pose setup copies the installed MediaPipe WASM runtime and downloads the pinned pretrained pose detector from Google. It does not download training data or train a model. Run it again after changing the MediaPipe package version.
+## Roadmap
 
-For the offline ML accelerator (CUDA or MLX):
+- Train a classifier on public rehab datasets with correct and incorrect labels (UI-PRMD, KIMORE, after checking their licenses), plus therapist-labelled clips from patients who gave training consent. It would plug in behind the same classifier interface.
+- A standard exercise library beyond the bodyweight squat and standing shoulder abduction.
+- A pilot with a physiotherapy clinic in Calgary.
 
-```bash
-cd backend
-uv sync --group ml
-uv run --group ml python check_accelerator.py
-```
+## Team
 
-`backend/.python-version` pins uv-managed Python 3.12.16. `backend/uv.lock` locks the dependencies. The optional `ml` group installs NumPy plus one accelerator stack per platform:
+- Ahron Ramos
+- Ben Bui
+- Ethan De La Cruz
+- Yiming (Harry) Jin
 
-| Platform | Stack | Device |
-| --- | --- | --- |
-| Windows, Linux | PyTorch from the explicit CUDA 12.8 index | `cuda` |
-| macOS on Apple Silicon | MLX | Apple GPU through Metal |
+## License
 
-`check_accelerator.py` picks CUDA first, then MLX, and exits non-zero when neither is usable. There is no CPU fallback. The API and production image do not need the `ml` group. A CUDA check needs an accessible NVIDIA GPU and driver; installing the wheel does not install or change a driver. Intel Macs have no supported accelerator.
-
-## Therapist-defined exercises
-
-Therapists can add their own exercises from the workspace with an uploaded or recorded demo video, then trim it to the part with two or more reps (2 to 60 s, starting and ending at rest). Only that part is used for the model, and patients see it looped. Pose keypoints are extracted in the browser, and a background trainer fits a model:
-
-```bash
-scripts/worker.sh
-```
-
-On Windows run `scripts\worker.ps1`. It reads the root `.env`, claims queued exercises every 5 seconds, and marks each one Ready or Failed with a reason shown to the therapist. Ready exercises can be prescribed like the built-in ones. The demo needs no worker: it fits the model in the browser right away.
-
-## Ask PhysioTrace assistant
-
-Signed-in patients and therapists can open "Ask PhysioTrace" in the sidebar for general questions about technique, camera setup, and the app. Therapists get their own version, with suggestions and a system prompt about the review queue, prescriptions, custom exercises, and coaching cues; it is reminded that clinical judgement is the therapist's and to keep identifying details out. It uses the OpenAI-compatible LLM settings in `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; Gemini by default) and allows 20 questions per person per day. Only the typed conversation is sent to the provider, never plans, reps, feedback, or video, and answers always defer to the therapist.
-
-## Connect Supabase
-
-1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the backend-only `SUPABASE_SECRET_KEY` in the root `.env`. Keep the existing key names.
-2. Apply the migrations from `backend/supabase/migrations/` to your intended local or linked project using the Supabase CLI. No remote migration is applied automatically by this implementation.
-3. Sign up patient and therapist accounts, by email or with Google. Every account starts as a patient. Never grant roles from signup metadata.
-4. Make yourself an admin (see below), then open `/dashboard`: the Admin tab sets therapist roles and assigns patients to therapists. Without an admin, `backend/supabase/admin-care.sql` still grants a therapist role and an assignment with database access.
-5. The therapist signs in at `/dashboard` and prescribes an exercise, date range, daily target, confidence threshold, and movement cue. The patient sees that plan after refreshing.
-
-### Google sign-in
-
-1. In Google Cloud, create an OAuth client (type Web application) with the authorized redirect URI `https://<your-project>.supabase.co/auth/v1/callback`.
-2. In the Supabase dashboard, open Authentication > Providers > Google, turn it on, and paste the client ID and secret.
-3. In Authentication > URL Configuration, add `http://localhost:3000/auth/callback` (and your deployed `/auth/callback` URL) to the redirect URLs.
-
-The "Continue with Google" button then signs people in through Supabase and returns to `/auth/callback`. Google accounts start as patients and take their name from Google. For a local `supabase start`, enable the `[auth.external.google]` block in `backend/supabase/config.toml` instead.
-
-### Admins
-
-Admins manage accounts from the Admin tab: set patient or therapist, promote or demote admins (at least one is always kept), and assign or unassign patients. They can also open the Therapist and Patient views for their own relationships. Admins get no access to other patients' reps, clips, or feedback.
-
-To create the first admin, put your email in `ADMIN_EMAILS` in the root `.env` (comma separated) and sign in with Google; the API grants admin on that sign-in. Only Google-verified emails qualify, because email confirmation is off and anyone could otherwise register your address by password. For a password-only admin, run `backend/supabase/admin-grant.sql` with database access.
-
-Use the Supabase CLI from `backend/`. Retain the starter's private storage, RLS, and email/password setup. Native Supabase auth, private storage URLs, and a live camera must still be verified against your configured project.
-
-## Privacy and safety
-
-Pose processing runs in the browser. The API verifies deterministic pose checks before recording results. Raw video is held only in a bounded local memory buffer, and uncertain clips upload only with separate review consent. Training consent is independent and off by default. A therapist can access only assigned patients.
-
-Revoking review consent hides shared clips; existing signed URLs expire within 60 seconds. Revoking training consent removes dataset membership and opts prior reps out of future exports. Offline dataset version functions exist, but labels never trigger exports or training.
-
-The baseline uses prototype joint-angle ranges and tracking visibility as its confidence score. It needs therapist validation before clinical use. Stop if you feel pain. PhysioTrace supports physical therapy care and does not replace a clinician.
-
-## Verify
-
-```powershell
-cd frontend
-npm run typecheck
-npm test
-npm run build
-cd ..\backend
-uv run pytest
-```
-
-`uv run pytest` syncs only the default groups. Use `uv run --group ml pytest` to preserve an installed CUDA or MLX environment. The seven backend tests cover routing, authentication, role checks, replay-safe submission, review validation, and secret-header handling. Three Node tests cover both exercise state machines and confidence routing.
-
-For the disposable PostgreSQL checks, install a local verification runtime without changing app dependencies:
-
-```powershell
-npm install --prefix .tools/verification --no-audit --no-fund @electric-sql/pglite
-node scripts/check-care-db.mjs .tools/verification/node_modules/@electric-sql/pglite/dist/index.js
-```
-
-These checks execute the migration and test RLS, role protection, retry idempotency, review correction, and consent revocation. They never connect to Supabase or train a model.
-
-Deploying to your own server and domain (AWS or Vultr) is covered step by step in `docs/deployment.md`.
-
-See `docs/architecture.md` for the approved proposal, `docs/decisions.md` for implementation choices, and `docs/verification.md` for the checks and remaining environment limits.
+This project is licensed under the MIT License. See the LICENSE file for details.

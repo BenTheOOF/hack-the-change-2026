@@ -21,8 +21,10 @@ real-time feedback. Low-confidence reps go to the patient's physical therapist
 <!-- Update as the project grows -->
 - `frontend/`: React app (patient session UI, PT dashboard)
 - `backend/`: FastAPI app (API, auth, review queue, rep logs)
-- `ml/`: data pipeline, rep segmentation, classifiers, training scripts
-- `docs/`: architecture notes and decisions
+- `ml/`: offline template fitter (`fit_template.py`), queue worker (`worker.py`), and fixtures shared by the TypeScript and Python tests
+- `docs/`: architecture notes and decisions; `docs/context.md` explains how the pieces connect; `docs/history/` keeps the original brief
+- `scripts/`: dev, worker, deploy-env, and worktree helpers
+- `CONTRIBUTING.md`: coding standards; read it and `docs/context.md` before changing anything
 
 ## Commands
 <!-- Fill in once set up -->

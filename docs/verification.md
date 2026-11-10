@@ -1,5 +1,14 @@
 # Implementation verification
 
+## Run the database checks
+
+`scripts/check-care-db.mjs` runs the PhysioTrace migrations in a throwaway in-memory PostgreSQL (PGlite) and checks row-level security, role protection, retry idempotency, review correction, and consent revocation. It never connects to Supabase. PGlite is not an app dependency, so install it into the git-ignored `.cache/` folder first:
+
+```bash
+npm install --prefix .cache/pglite --no-audit --no-fund @electric-sql/pglite
+node scripts/check-care-db.mjs .cache/pglite/node_modules/@electric-sql/pglite/dist/index.js
+```
+
 Verified locally on 2026-11-07. No training was run and no connected database was modified.
 
 - Frontend strict typecheck passed.

@@ -1,6 +1,6 @@
 # Context
 
-Read this before changing anything. Rules for changes are in `.coding-standards`.
+Read this before changing anything. Rules for changes are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## What this repo is
 
@@ -27,8 +27,8 @@ Coolify, n8n, PocketBase and Appwrite were left out on purpose because they over
 3. Pages that need the API send the Supabase access token as a bearer token.
 4. `get_current_user` in `backend/app/auth.py` checks that token by calling Supabase `/auth/v1/user`. The API holds no JWT secret.
 5. `POST /ai/chat` counts a request through the `increment_ai_usage` database function (secret key, `apikey` header), then calls the LLM.
-6. Notes use Supabase realtime. The `notes` table is in the `supabase_realtime` publication.
-7. Files live in the private `uploads` bucket at `<user id>/<file name>`.
+6. The starter `notes` table (realtime) and private `uploads` bucket are still created by their migrations. No PhysioTrace page uses them.
+7. Review clips go to the private `review-clips` bucket through `PUT /physio/reps/{id}/clip`, and therapist demo videos to `exercise-demos`.
 
 ## Decisions and traps
 
