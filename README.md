@@ -4,7 +4,7 @@ PhysioTrace watches a patient do their prescribed physio exercises through the b
 
 <!-- AWARD PHOTO: docs/images/award.jpg (added later) -->
 
-🥈 2nd place overall and winner of the [CATEGORY NAME] category at Hack the Change 2026.
+🥈 2nd place overall and winner of the [Entire](https://entire.com/about/company) category at Hack the Change 2026.
 
 ## What it is
 
@@ -121,10 +121,9 @@ The frontend tests use Node's built-in runner and cover the exercise state machi
 
 ## Team
 
-<!-- TEAM: confirm names and roles before publishing. Listed from git history. -->
-
 - Ahron Ramos
 - Ben Bui
+- Ethan De La Cruz
 - Yiming (Harry) Jin
 
 ## License
