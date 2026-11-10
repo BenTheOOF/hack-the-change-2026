@@ -11,14 +11,9 @@ import {
   type Evaluation,
   type PoseFrame,
 } from "./engine";
-import {
-  CustomExerciseForm,
-  trainingStatusLabel,
-  type ExerciseSubmission,
-} from "./custom-exercise-form";
+import type { ExerciseSubmission } from "./custom-exercise-form";
 import { Assistant } from "@/features/ai/assistant";
 import { AdminConsole, type Account, type Assignment } from "./admin-console";
-import { ExerciseSteps } from "./exercise-steps";
 import { LiveSession } from "./live-session";
 import { Brand, Icon } from "@/features/ui/icons";
 import {
@@ -33,14 +28,14 @@ import {
   localClipIds,
   saveLocalClip,
 } from "./local-clips";
-import { PoseReplay } from "./pose-replay";
 import type { Overview, Prescription, Profile, Rep, Review } from "./types";
 import { localDay } from "./day";
 import { DEMO_KEY, demoAccounts, demoAssignments, demoPatient, demoPlans, demoTherapist, demoVideoKey, sampleFrames, type DemoState } from "./demo-data";
-import { Empty, NavItem, Stat, modelStat } from "./app-shell";
-import { RepClip, RepList, type Replay, type ReplaySource } from "./rep-list";
-import { DemoVideo, MovementIllustration } from "./exercise-media";
+import { NavItem } from "./app-shell";
+import type { Replay, ReplaySource } from "./rep-list";
 import { PrescriptionForm } from "./prescription-form";
+import { FeedbackPage, HistoryPage, TodayPage } from "./patient-pages";
+import { ExercisesPage, PlansPage, QueuePage } from "./therapist-pages";
 
 export function PhysioApp({ demo = false }: { demo?: boolean }) {
   const token = useRef("");
@@ -1025,57 +1020,7 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                 audience="therapist"
               />
             ) : page === "plans" ? (
-              <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">The right plan for each person</span>
-                  <h1>Patients &amp; plans</h1>
-                  <p>See what each patient is working on and prescribe what comes next.</p>
-                </div>
-              </div>
-              <div className="patient-plans">
-                {therapistPatients.length === 0 ? (
-                  <div className="panel">
-                    <Empty
-                      title="No assigned patients yet."
-                      text="An administrator links patients to your account. They appear here once assigned."
-                    />
-                  </div>
-                ) : (
-                  therapistPatients.map((p) => {
-                    const theirs = therapistPlans.filter((plan) => plan.patient_id === p.patient_id);
-                    return (
-                      <article className="panel patient-plan-card" key={p.patient_id}>
-                        <div className="section-heading">
-                          <h2>{p.care_profiles.display_name}</h2>
-                          <span className="muted">
-                            {theirs.length} active plan{theirs.length === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                        {theirs.length ? (
-                          <ul className="plan-list">
-                            {theirs.map((plan) => (
-                              <li key={plan.id}>
-                                <strong>{info(plan).name}</strong>
-                                <span className="muted">
-                                  {plan.daily_target} reps a day · {plan.starts_on} to {plan.ends_on}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">No active plans. Prescribe one below.</p>
-                        )}
-                      </article>
-                    );
-                  })
-                )}
-              </div>
-              <div className="panel prescription-panel">
-                <h2>Prescribe an exercise</h2>
-                <p className="muted">
-                  Set a daily target for a patient already assigned to you.
-                </p>
+              <PlansPage therapistPatients={therapistPatients} therapistPlans={therapistPlans} info={info}>
                 <PrescriptionForm
                   customs={customs.filter((c) => c.status === "ready")}
                   patients={
@@ -1115,537 +1060,72 @@ export function PhysioApp({ demo = false }: { demo?: boolean }) {
                       : null;
                   }}
                 />
-              </div>
-              </>
+              </PlansPage>
             ) : page === "exercises" ? (
-              <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">Movements made for your patients</span>
-                  <h1>Add exercise</h1>
-                  <p>Add a movement from a demo video. Once its model is ready, prescribe it like any other exercise.</p>
-                </div>
-              </div>
-              <div className="panel custom-panel">
-                {customs.length > 0 && (
-                  <h2 className="custom-subhead">Saved exercises</h2>
-                )}
-                {customs.length > 0 && (
-                  <ul className="custom-list">
-                    {customs.map((c) => (
-                      <li key={c.id}>
-                        <span className={"badge status-" + c.status}>
-                          {trainingStatusLabel(c.status)}
-                        </span>
-                        <div>
-                          <strong>{c.name}</strong>
-                          <small>
-                            {c.status === "failed"
-                              ? c.status_detail || "The demo could not be used. Record it again."
-                              : c.status === "ready" && c.model
-                                ? `${c.model.demoReps} demo reps · ${c.view === "front" ? "facing camera" : "side-on"} · ${c.model_version}`
-                                : "The trainer will pick this up shortly."}
-                          </small>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <h2 className="custom-subhead">Add an exercise</h2>
-                <p className="muted">
-                  Upload or record a demo, trim it to the reps you want, then save.
-                </p>
-                <CustomExerciseForm busy={busy} demo={demo} onSubmit={submitExercise} />
-              </div>
-              </>
+              <ExercisesPage customs={customs} busy={busy} demo={demo} submitExercise={submitExercise} />
             ) : (
-              <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">
-                    A human eye makes the difference
-                  </span>
-                  <h1>Care, with a closer look</h1>
-                  <p>
-                    Review uncertain movements and help your patients move
-                    forward.
-                  </p>
-                </div>
-                <button
-                  className="secondary"
-                  onClick={() =>
-                    demo ? setNotice("Demo queue is up to date.") : void load()
-                  }
-                  disabled={loading}
-                >
-                  <Icon name="refresh" /> Refresh queue
-                </button>
-              </div>
-              <div className="stats-grid">
-                <Stat
-                  label="Awaiting your review"
-                  value={String(queue.length)}
-                  detail="Uncertain repetitions"
-                  color="peach"
-                />
-                <Stat
-                  label="Patients in your care"
-                  value={demo ? "1" : String(overview?.patients?.length ?? 0)}
-                  detail="Only your assigned patients"
-                  color="sage"
-                />
-                <Stat
-                  label="Exercise models"
-                  {...modelStat(customs)}
-                  color="cream"
-                />
-              </div>
-              <div className="review-layout">
-                <div className="panel">
-                  <div className="section-heading">
-                    <h2>
-                      Review queue{" "}
-                      <span className="subtle-count">{queue.length}</span>
-                    </h2>
-                    <span className="muted">Oldest first</span>
-                  </div>
-                  {!queue.length ? (
-                    <Empty
-                      title="All caught up."
-                      text="Uncertain repetitions from your assigned patients will appear here."
-                    />
-                  ) : (
-                    queue.map((rep) => (
-                      <button
-                        className={
-                          "queue-item " +
-                          (selected?.id === rep.id ? "queue-selected" : "")
-                        }
-                        key={rep.id}
-                        disabled={busy}
-                        onClick={() => void inspect(rep)}
-                      >
-                        <span className="exercise-symbol">
-                          <Icon name={rep.exercise === "squat" ? "down" : "up"} />
-                        </span>
-                        <span>
-                          <strong>
-                            {demo
-                              ? demoPatient.display_name
-                              : (overview?.patients?.find(
-                                  (p) => p.patient_id === rep.patient_id,
-                                )?.care_profiles.display_name ?? "Patient")}
-                          </strong>
-                          <small>
-                            {info(rep).name} ·{" "}
-                            {Math.round(rep.confidence * 100)}% confidence
-                          </small>
-                        </span>
-                        <span className="queue-time">
-                          {rep.exercise_day}
-                          <br />
-                          Review
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-                <div className="panel">
-                  {selected ? (
-                    <>
-                      <div className="section-heading">
-                        <h2>{info(selected).short}</h2>
-                        <span className="badge inconclusive">
-                          Needs your review
-                        </span>
-                      </div>
-                      <PoseReplay frames={pose} videoUrl={clip} />
-                      <p className="review-reason">
-                        <strong>Why it was flagged:</strong> {selected.feedback}{" "}
-                        <span className="muted">
-                          {Math.round(selected.confidence * 100)}% confidence ·{" "}
-                          {selected.model_version} · {selected.exercise_day}
-                        </span>
-                      </p>
-                      {!clip && (
-                        <p className="muted">
-                          {demo
-                            ? "Simulated reps have no video. Turn on the camera in a patient session to record one."
-                            : "This patient has not shared video for this rep, so only the recorded pose is shown."}
-                        </p>
-                      )}
-                      <form onSubmit={saveReview} className="review-form">
-                        <fieldset>
-                          <legend>Your assessment</legend>
-                          <label>
-                            <input
-                              type="radio"
-                              name="label"
-                              checked={label === "correct"}
-                              onChange={() => setLabel("correct")}
-                            />
-                            Correct
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name="label"
-                              checked={label === "incorrect"}
-                              onChange={() => setLabel("incorrect")}
-                            />
-                            Needs adjustment
-                          </label>
-                        </fieldset>
-                        {label === "incorrect" && (
-                          <label>
-                            Error type
-                            <select
-                              value={errorType}
-                              onChange={(e) => setErrorType(e.target.value)}
-                            >
-                              <option value="range_of_motion">
-                                Range of motion
-                              </option>
-                              <option value="tempo">Movement tempo</option>
-                              <option value="uneven_movement">
-                                Uneven movement
-                              </option>
-                              <option value="other">Other</option>
-                            </select>
-                          </label>
-                        )}
-                        <label>
-                          Feedback for your patient
-                          <textarea
-                            value={feedback}
-                            onChange={(e) => setFeedback(e.target.value)}
-                            placeholder="A clear cue for their next repetition…"
-                            required
-                            maxLength={2000}
-                            rows={3}
-                          />
-                        </label>
-                        <p className="muted">
-                          A correct label counts toward the original exercise
-                          day. Training requires separate consent.
-                        </p>
-                        <button
-                          className="primary"
-                          disabled={busy || !feedback.trim()}
-                        >
-                          Save review & send feedback
-                        </button>
-                      </form>
-                    </>
-                  ) : (
-                    <Empty
-                      title="A little context. Better care."
-                      text="Select a repetition to inspect its pose replay and leave feedback."
-                    />
-                  )}
-                </div>
-              </div>
-              </>
+              <QueuePage
+                demo={demo}
+                setNotice={setNotice}
+                load={load}
+                loading={loading}
+                queue={queue}
+                overview={overview}
+                customs={customs}
+                selected={selected}
+                busy={busy}
+                inspect={inspect}
+                info={info}
+                pose={pose}
+                clip={clip}
+                saveReview={saveReview}
+                label={label}
+                setLabel={setLabel}
+                errorType={errorType}
+                setErrorType={setErrorType}
+                feedback={feedback}
+                setFeedback={setFeedback}
+              />
             )
           ) : page === "assistant" ? (
             <Assistant token={() => token.current} demo={demo} />
           ) : page === "today" ? (
-            <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">A little better, every day</span>
-                  <h1>
-                    Your pace. Your progress
-                    <span className="accent-dot">.</span>
-                  </h1>
-                  <p>
-                    Welcome back
-                    {profile ? ", " + profile.display_name.split(" ")[0] : ""}.
-                    Let’s make room for a little movement.
-                  </p>
-                </div>
-                <span className="care-pill">
-                  <span className="status-dot" /> Guided by your therapist
-                </span>
-              </div>
-              <div className="stats-grid">
-                <Stat
-                  label="Today’s accepted reps"
-                  value={String(accepted)}
-                  suffix={"/ " + target}
-                  detail={
-                    target
-                      ? Math.round(Math.min(1, accepted / target) * 100) +
-                        "% of your daily plan"
-                      : "Your plan is ready when assigned"
-                  }
-                  color="sage"
-                />
-                <Stat
-                  label="Exercises in your plan"
-                  value={String(plans.length)}
-                  detail="Move at a comfortable pace"
-                  color="cream"
-                />
-                <Stat
-                  label="Waiting for a closer look"
-                  value={String(pending)}
-                  detail="Your therapist reviews uncertain reps"
-                  color="peach"
-                />
-              </div>
-              <div className="patient-grid">
-                <section>
-                  <div className="section-heading">
-                    <h2>Your movement plan</h2>
-                    <span className="muted">
-                      Today · {plans.length} exercises
-                    </span>
-                  </div>
-                  {!plans.length ? (
-                    <div className="panel">
-                      <Empty
-                        title="Your recovery starts with a plan."
-                        text="Your assigned therapist can prescribe exercises and a daily target. Refresh once your plan is ready."
-                      />
-                      <button className="secondary" onClick={() => void load()}>
-                        Refresh plan
-                      </button>
-                    </div>
-                  ) : (
-                    // Exercises still to do come first; finished ones move to the end.
-                    plans
-                      .map((plan) => {
-                        const count = todayReps.filter(
-                          (r) =>
-                            r.prescription_id === plan.id &&
-                            r.label === "correct",
-                        ).length;
-                        return {
-                          plan,
-                          count,
-                          done: count >= plan.daily_target,
-                        };
-                      })
-                      .sort((a, b) => Number(a.done) - Number(b.done))
-                      .map(({ plan, count, done }, i) => {
-                        return (
-                          <article className="exercise-card" key={plan.id}>
-                            <div
-                              className={
-                                "exercise-art " +
-                                (i % 2 ? "art-peach" : "art-sage")
-                              }
-                            >
-                              <MovementIllustration exercise={plan.exercise} />
-                              <span className="art-number">0{i + 1}</span>
-                            </div>
-                            <div className="exercise-content">
-                              <span className="eyebrow">
-                                {info(plan).focus}
-                              </span>
-                              <h3>{info(plan).name}</h3>
-                              <p>
-                                {plan.instructions ||
-                                  (plan.exercise === "squat"
-                                    ? "Build a steady foundation, one controlled movement at a time."
-                                    : plan.exercise === "custom"
-                                      ? info(plan).instruction
-                                      : "Find a little more freedom in every comfortable reach.")}
-                              </p>
-                              <ExerciseSteps steps={info(plan).steps} />
-                              {plan.custom_exercise_id && (
-                                <DemoVideo
-                                  url={demoVideoUrls[plan.custom_exercise_id]}
-                                  custom={info(plan).custom}
-                                  onOpen={() =>
-                                    demoVideoFor(plan.custom_exercise_id!)
-                                  }
-                                  name={info(plan).name}
-                                />
-                              )}
-                              <div className="exercise-progress">
-                                <span>
-                                  {count}{" "}
-                                  <span className="muted">
-                                    / {plan.daily_target} reps
-                                  </span>
-                                </span>
-                                <span>
-                                  {done
-                                    ? "Daily target reached"
-                                    : "Daily target"}
-                                </span>
-                              </div>
-                              <div className="progress-track">
-                                <span
-                                  style={{
-                                    width:
-                                      Math.min(
-                                        100,
-                                        (count / plan.daily_target) * 100,
-                                      ) + "%",
-                                  }}
-                                />
-                              </div>
-                              <button
-                                className={
-                                  (done ? "secondary" : "primary") +
-                                  " start-exercise"
-                                }
-                                disabled={busy}
-                                onClick={() => void start(plan)}
-                              >
-                                {done ? "Practice again" : "Start exercise"}
-                              </button>
-                            </div>
-                          </article>
-                        );
-                      })
-                  )}
-                </section>
-                <aside>
-                  <div className="panel note-panel">
-                    <span className="eyebrow">A note for your journey</span>
-                    <h2>
-                      Progress doesn’t
-                      <br />
-                      have to be perfect.
-                    </h2>
-                    <p>
-                      Some days feel easier than others. Showing up, moving
-                      comfortably, and listening to your body all count.
-                    </p>
-                    <div className="divider" />
-                    <span className="muted">Small moves. Real progress.</span>
-                  </div>
-                  <div className="panel feedback-preview">
-                    <div className="section-heading">
-                      <h3>From your therapist</h3>
-                    </div>
-                    {reviews.length ? (
-                      <>
-                        <p>“{reviews[0].feedback}”</p>
-                        <button
-                          className="text-button"
-                          onClick={() => void openPage("feedback")}
-                        >
-                          See all feedback
-                        </button>
-                      </>
-                    ) : (
-                      <p className="muted">
-                        Your therapist’s cues and reviewed repetitions will
-                        appear here.
-                      </p>
-                    )}
-                  </div>
-                </aside>
-              </div>
-              <div className="safety-inline">
-                <Icon name="info" />
-                <p>
-                  <strong>Move with care.</strong> Stop if you feel pain.
-                  PhysioTrace supports your therapist’s care and does not
-                  replace it.
-                </p>
-              </div>
-            </>
+            <TodayPage
+              profile={profile}
+              accepted={accepted}
+              target={target}
+              plans={plans}
+              pending={pending}
+              load={load}
+              todayReps={todayReps}
+              info={info}
+              demoVideoUrls={demoVideoUrls}
+              demoVideoFor={demoVideoFor}
+              busy={busy}
+              start={start}
+              reviews={reviews}
+              openPage={openPage}
+            />
           ) : page === "history" ? (
-            <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">Every step forward</span>
-                  <h1>Your movement history</h1>
-                  <p>
-                    Accepted reps, adjustments, and movements waiting for
-                    review.
-                  </p>
-                </div>
-              </div>
-              <div className="panel">
-                {!history.length ? (
-                  <Empty
-                    title="Your first rep is a fresh start."
-                    text="Complete an exercise to see your history here."
-                  />
-                ) : (
-                  <RepList
-                    reps={history}
-                    customs={customs}
-                    loadReplay={loadRepReplay}
-                    videoIds={historyVideos}
-                  />
-                )}
-                {moreHistory && (
-                  <button
-                    className="secondary"
-                    disabled={busy}
-                    onClick={() =>
-                      void guarded(async () => {
-                        const next: Rep[] = await request(
-                          "/history?offset=" + history.length,
-                        );
-                        setHistory((current) => [...current, ...next]);
-                        setMoreHistory(next.length === 50);
-                      })
-                    }
-                  >
-                    Load more
-                  </button>
-                )}
-              </div>
-            </>
+            <HistoryPage
+              history={history}
+              customs={customs}
+              loadRepReplay={loadRepReplay}
+              historyVideos={historyVideos}
+              moreHistory={moreHistory}
+              busy={busy}
+              onLoadMore={() =>
+                void guarded(async () => {
+                  const next: Rep[] = await request(
+                    "/history?offset=" + history.length,
+                  );
+                  setHistory((current) => [...current, ...next]);
+                  setMoreHistory(next.length === 50);
+                })
+              }
+            />
           ) : (
-            <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">Care that stays connected</span>
-                  <h1>A little guidance goes a long way</h1>
-                  <p>Personal feedback from your physical therapist.</p>
-                </div>
-              </div>
-              <div className="feedback-feed">
-                {reviews.length ? (
-                  reviews.map((review) => (
-                    <article className="panel" key={review.id}>
-                      <div className="section-heading">
-                        <span className={"badge " + review.label}>
-                          {review.label === "correct"
-                            ? "Rep accepted"
-                            : "Movement cue"}
-                        </span>
-                        <span className="muted">
-                          {new Date(review.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <h3>{review.feedback}</h3>
-                      <p className="muted">
-                        {review.label === "correct"
-                          ? "This review counts toward the original exercise day."
-                          : "Use this cue during your next comfortable repetition."}
-                      </p>
-                      <RepClip
-                        load={() =>
-                          loadRepReplay(
-                            reps.find((r) => r.id === review.rep_id) ?? {
-                              id: review.rep_id,
-                            },
-                          )
-                        }
-                      />
-                    </article>
-                  ))
-                ) : (
-                  <div className="panel">
-                    <Empty
-                      title="You’re connected to your care."
-                      text="After your therapist reviews an uncertain rep, their feedback will appear here."
-                    />
-                  </div>
-                )}
-              </div>
-            </>
+            <FeedbackPage reviews={reviews} reps={reps} loadRepReplay={loadRepReplay} />
           )}
         </main>
         <footer className="app-footer">
