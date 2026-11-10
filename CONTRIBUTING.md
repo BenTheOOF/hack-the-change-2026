@@ -23,7 +23,7 @@ For people and agents who change this repo. Read [docs/context.md](docs/context.
 1. Web code goes in `frontend/src/features/<feature>/`. Pages in `src/app` stay thin.
 2. API routes go in a new file in `backend/app/routers/`. Do not edit `app/main.py`.
 3. Schema changes go in a new timestamped file in `backend/supabase/migrations/`. Never edit a migration that is on `main`. Never change the schema in the dashboard.
-4. Shared files are listed in `docs/OWNERSHIP.md`. Change them in small PRs and rebase before merging.
+4. Shared files (`.env.example`, `frontend/src/lib/`, `frontend/src/proxy.ts`, `backend/app/auth.py`, `backend/app/config.py`, `backend/pyproject.toml`, `frontend/package.json`, `scripts/`) change in small PRs. Rebase before merging. Classifier contract changes touch `frontend/src/features/physio/engine.ts` and `backend/app/physio.py` together.
 5. Branches are `feat/<name>`. `main` always deploys.
 
 ## Security
