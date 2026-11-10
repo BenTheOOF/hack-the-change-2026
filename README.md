@@ -14,14 +14,14 @@ Try it without an account at `/demo` once it's running locally (see [Run it loca
 
 ## Screenshots
 
-| | |
-| --- | --- |
-| ![Landing page](docs/images/landing.png) | ![Patient session with the movement gauge](docs/images/patient-session.png) |
-| Landing page | Live session with the depth gauge and its target band |
-| ![Incorrect rep replayed with a skeleton overlay](docs/images/incorrect-rep-replay.png) | ![Therapist review queue](docs/images/therapist-review.png) |
-| An incorrect rep, replayed with a skeleton and a cue | Therapist review queue with the flagged rep |
-| ![Patient feedback feed](docs/images/patient-feedback.png) | ![Adding a custom exercise and trimming the demo](docs/images/add-exercise-trim.png) |
-| Therapist feedback in the patient's feed | Adding an exercise and trimming its demo video |
+|                                                                                         |                                                                                      |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![Landing page](docs/images/landing.png)                                                | ![Patient session with the movement gauge](docs/images/patient-session.png)          |
+| Landing page                                                                            | Live session with the depth gauge and its target band                                |
+| ![Incorrect rep replayed with a skeleton overlay](docs/images/incorrect-rep-replay.png) | ![Therapist review queue](docs/images/therapist-review.png)                          |
+| An incorrect rep, replayed with a skeleton and a cue                                    | Therapist review queue with the flagged rep                                          |
+| ![Patient feedback feed](docs/images/patient-feedback.png)                              | ![Adding a custom exercise and trimming the demo](docs/images/add-exercise-trim.png) |
+| Therapist feedback in the patient's feed                                                | Adding an exercise and trimming its demo video                                       |
 
 <p align="center"><img src="docs/images/patient-session-mobile.png" alt="Patient session on a phone" width="260"></p>
 
@@ -53,7 +53,7 @@ Therapists can also add their own exercises. The worker in `ml/worker.py` runs o
 
 ## Why it matters
 
-Patients do their home exercises between appointments with nobody checking their form, and in Alberta those gaps can be long. In 2023, the median wait from a GP referral to treatment by a specialist was 33.5 weeks in Alberta, against 27.7 weeks across Canada ([Fraser Institute, *Waiting Your Turn: Wait Times for Health Care in Canada, 2023*](https://www.fraserinstitute.org/sites/default/files/waiting-your-turn-2023.pdf)). That figure covers specialist care in general, not physiotherapy alone. PhysioTrace lets a therapist see home practice between visits, and they only review the reps the rules can't judge.
+Patients do their home exercises between appointments with nobody checking their form, and in Alberta those gaps can be long. In 2023, the median wait from a GP referral to treatment by a specialist was 33.5 weeks in Alberta, against 27.7 weeks across Canada ([Fraser Institute, _Waiting Your Turn: Wait Times for Health Care in Canada, 2023_](https://www.fraserinstitute.org/sites/default/files/waiting-your-turn-2023.pdf)). That figure covers specialist care in general, not physiotherapy alone. PhysioTrace lets a therapist see home practice between visits, and they only review the reps the rules can't judge.
 
 ## Run it locally
 
@@ -128,4 +128,4 @@ The frontend tests use Node's built-in runner and cover the exercise state machi
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the MIT License. See the LICENSE file for details.
