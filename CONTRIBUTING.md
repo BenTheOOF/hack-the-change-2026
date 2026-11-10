@@ -1,6 +1,6 @@
 # Coding standards
 
-For people and agents who change this repo. Read CONTEXT.md first.
+For people and agents who change this repo. Read [docs/context.md](docs/context.md) first.
 
 ## Write less
 

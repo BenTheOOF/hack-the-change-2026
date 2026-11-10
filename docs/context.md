@@ -1,6 +1,6 @@
 # Context
 
-Read this before changing anything. Rules for changes are in `.coding-standards`.
+Read this before changing anything. Rules for changes are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## What this repo is
 
